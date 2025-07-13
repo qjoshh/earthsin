@@ -1,0 +1,2529 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Earth Simulator</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0c0c0c, #1a1a2e);
+      cursor: crosshair;
+    }
+
+    #globe {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: radial-gradient(circle at center, #1a1a2e, #000);
+    }
+
+    #infoBox {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      max-width: 350px;
+      z-index: 10;
+      display: none;
+      transition: all 0.4s ease;
+      box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 255, 204, 0.3);
+    }
+
+    #infoBox.show {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(0, 255, 204, 0.8);
+    }
+
+    #controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #controls>button {
+      padding: 12px 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(17, 17, 17, 0.9);
+      color: white;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(5px);
+    }
+
+    #controls>button:hover {
+      background: rgba(0, 255, 204, 0.2);
+      transform: translateY(-2px);
+    }
+
+    #searchContainer {
+      position: relative;
+      width: 250px;
+    }
+
+    #searchRegion {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(17, 17, 17, 0.9);
+      color: white;
+      outline: none;
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+    }
+
+    #searchRegion:focus {
+      border: 2px solid #00ffcc;
+      background: rgba(0, 255, 204, 0.1);
+    }
+
+    #searchResults {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.95);
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 255, 204, 0.3);
+    }
+
+    .search-item {
+      padding: 10px 15px;
+      cursor: pointer;
+      color: white;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      transition: background 0.2s ease;
+    }
+
+    .search-item:hover {
+      background: rgba(0, 255, 204, 0.2);
+    }
+
+    .search-item:last-child {
+      border-bottom: none;
+    }
+
+    #streakCounter {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 16px;
+      z-index: 10;
+      border: 1px solid rgba(0, 255, 0, 0.3);
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    }
+
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #ccc;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      z-index: 10;
+      line-height: 1.4;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00ffcc;
+      font-size: 18px;
+      z-index: 5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="loading">Loading Earth Simulator...</div>
+  <div id="infoBox"></div>
+  <div id="controls">
+    <button id="toggleMode">Switch to Bizarre Mode</button>
+    <button id="randomSpin">🎲 Random Spin</button>
+    <button id="focusRegion">🎯 Focus Region</button>
+    <div id="searchContainer">
+      <input type="text" id="searchRegion" placeholder="Search countries and regions..." />
+      <div id="searchResults"></div>
+    </div>
+  </div>
+  <div id="streakCounter">🔥 Streak: 0</div>
+  <div id="instructions">
+    🖱️ Drag: Rotate Earth (any direction)<br />
+    🔄 Wheel: Zoom In/Out<br />
+    👆 Click Arrow: Get Facts<br />
+    ⚡ Double-click: Toggle Auto-rotation
+  </div>
+  <canvas id="globe"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three-geojson-geometry@1.0.3/three-geojson-geometry.min.js"></script>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // Remove loading message
+      document.querySelector('.loading').style.display = 'none';
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas: document.getElementById('globe'),
+        antialias: true,
+        alpha: true
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000011);
+
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 250);
+
+      // Create Earth with realistic textures
+      const earthGeometry = new THREE.SphereGeometry(50, 128, 128); // high-res sphere
+
+
+      // Load Earth texture
+      const textureLoader = new THREE.TextureLoader();
+
+      const highResTexture = textureLoader.load('/world.topo.200409.3x21600x10800.jpg'); // detailed
+      const bumpTexture = textureLoader.load('/topography.jpg');
+      const specularMap = textureLoader.load('textures/earth_specular.png');
+
+
+
+      const earthMaterial = new THREE.MeshPhongMaterial({
+        map: highResTexture, // default to low-res
+        bumpMap: bumpTexture,
+        bumpScale: 0.2,
+        specularMap: specularMap,
+        specular: new THREE.Color('grey'),
+        shininess: 10
+      });
+
+
+      // Create a more detailed Earth with realistic appearance
+      const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
+      earthMesh.receiveShadow = true;
+      scene.add(earthMesh);
+
+      // Country Borders from GeoJSON
+      fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+        .then(res => res.json())
+        .then(data => {
+          data.features.forEach(feature => {
+            const geometry = new THREE.GeoJsonGeometry(feature.geometry, 50);
+            const material = new THREE.LineBasicMaterial({ color: 0x00ffcc });
+            const line = new THREE.LineSegments(geometry, material);
+            scene.add(line);
+          });
+        });
+
+
+      // Add atmosphere glow
+      const atmosphereGeometry = new THREE.SphereGeometry(52, 64, 64);
+      const atmosphereMaterial = new THREE.MeshBasicMaterial({
+        color: 0x4488ff,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.BackSide
+      });
+      const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+      scene.add(atmosphere);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(100, 100, 50);
+      directionalLight.castShadow = true;
+      scene.add(directionalLight);
+
+      // Add stars
+      const starGeometry = new THREE.BufferGeometry();
+      const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5 });
+      const starVertices = [];
+      for (let i = 0; i < 1000; i++) {
+        const x = (Math.random() - 0.5) * 2000;
+        const y = (Math.random() - 0.5) * 2000;
+        const z = (Math.random() - 0.5) * 2000;
+        starVertices.push(x, y, z);
+      }
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      const stars = new THREE.Points(starGeometry, starMaterial);
+      scene.add(stars);
+
+      // Enhanced navigation controls with improved rotation
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+      let rotationVelocity = { x: 0, y: 0 };
+      let earthRotation = { x: 0, y: 0 };
+      let autoRotate = true;
+      let cameraDistance = 250;
+
+      // Improved mouse controls for free rotation
+      renderer.domElement.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        autoRotate = false;
+        previousMousePosition = { x: e.clientX, y: e.clientY };
+        renderer.domElement.style.cursor = 'grabbing';
+        rotationVelocity = { x: 0, y: 0 };
+      });
+
+      renderer.domElement.addEventListener('mouseup', () => {
+        isDragging = false;
+        renderer.domElement.style.cursor = 'grab';
+      });
+
+      renderer.domElement.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const deltaMove = {
+            x: e.clientX - previousMousePosition.x,
+            y: e.clientY - previousMousePosition.y
+          };
+
+          rotationVelocity.x = deltaMove.y * 0.01;
+          rotationVelocity.y = deltaMove.x * 0.01;
+
+          earthRotation.x += rotationVelocity.x;
+          earthRotation.y += rotationVelocity.y;
+
+          previousMousePosition = { x: e.clientX, y: e.clientY };
+        } else {
+          renderer.domElement.style.cursor = 'grab';
+        }
+      });
+
+      renderer.domElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        cameraDistance += e.deltaY * 0.2;
+        cameraDistance = Math.max(70, Math.min(150, cameraDistance));
+        camera.position.z = cameraDistance;
+      });
+
+      // Double-click to toggle auto-rotation
+      renderer.domElement.addEventListener('dblclick', () => {
+        autoRotate = !autoRotate;
+      });
+
+      let mode = 'normal';
+      const infoBox = document.getElementById('infoBox');
+      const toggleBtn = document.getElementById('toggleMode');
+      const searchInput = document.getElementById('searchRegion');
+      const searchResults = document.getElementById('searchResults');
+      const streakDisplay = document.getElementById('streakCounter');
+      const focusBtn = document.getElementById('focusRegion');
+
+      let streak = 0;
+      let arrowMarkers = [];
+      let currentRegion = null;
+      let bizarreFactIndex = 0;
+
+      const factsData = {
+        normal: [
+          {
+            name: "Japan",
+            lat: 35.6895,
+            lng: 139.6917,
+            facts: [
+              "Tokyo's Greater Tokyo Area is the most populous metropolitan area in the world with over 37 million people, making it larger than the entire population of Canada. This massive urban agglomeration includes Tokyo, Yokohama, Kawasaki, and surrounding prefectures, creating a continuous urban landscape that stretches for hundreds of kilometers and serves as the economic heart of Japan.",
+              "Japan has over 5 million vending machines scattered throughout the country - approximately one for every 25 people, making it the highest vending machine density in the world. These machines sell everything from hot coffee and cold drinks to hot meals, umbrellas, and even fresh eggs. They're so integrated into daily life that many run on renewable energy and accept mobile payments.",
+              "The country experiences approximately 1,500 earthquakes every year due to its location on the Pacific Ring of Fire, where four major tectonic plates meet. Most are minor tremors, but Japan has developed the world's most advanced earthquake detection and building safety systems. The country's early warning system can detect earthquakes and alert citizens seconds before the shaking begins.",
+              "Japan has the world's oldest continuous monarchy, with the current imperial line dating back over 2,600 years according to traditional records. Emperor Naruhito is the 126th emperor in this unbroken succession. The imperial family plays a ceremonial role in modern Japan, with the emperor serving as a symbol of national unity rather than holding political power.",
+              "The Japanese railway system is renowned for its punctuality, with the average delay of trains being just 18 seconds. The Shinkansen bullet trains have been operating since 1964 and have never had a fatal accident due to derailment or collision. These trains can reach speeds of up to 320 km/h and are considered one of the safest forms of transportation in the world.",
+              "Japan consists of 6,852 islands, though only about 430 are inhabited. The four main islands - Honshu, Hokkaido, Kyushu, and Shikoku - make up 97% of the country's total land area. Many of the smaller islands are uninhabited and serve as nature reserves, while others host unique communities that have preserved traditional ways of life for centuries.",
+              "Cherry blossom season, known as 'sakura,' is a national obsession that triggers massive internal tourism as people travel to witness the brief but spectacular blooming period. The Japan Meteorological Agency issues official cherry blossom forecasts, and the blooming front moves from south to north across the country over several weeks. This tradition of 'hanami' (flower viewing) has been celebrated for over 1,000 years.",
+              "Japan has a unique cultural phenomenon called 'forest bathing' or 'shinrin-yoku,' which is a meditative practice of immersing oneself mindfully in nature. This practice has been scientifically proven to reduce stress hormones, boost immune function, and improve overall mental health. The government officially promotes forest bathing as a form of preventive healthcare and therapy."
+            ]
+          },
+          {
+            name: "Brazil",
+            lat: -14.235,
+            lng: -51.9253,
+            facts: [
+              "The Amazon rainforest produces approximately 20% of the world's oxygen and covers about 60% of Brazil's total land area. This massive ecosystem is home to an estimated 390 billion individual trees across 16,000 different species. The Amazon also influences global weather patterns and stores massive amounts of carbon, making it crucial for climate regulation worldwide.",
+              "Brazil has the most species of primates in the world with over 130 different species, including the iconic golden lion tamarin and the largest primate in the Americas, the muriqui. Many of these species are endemic to Brazil and found nowhere else on Earth. The country's diverse ecosystems from rainforests to savannas provide perfect habitats for this incredible primate diversity.",
+              "The Brazilian national football team has won the FIFA World Cup five times (1958, 1962, 1970, 1994, and 2002), more than any other nation in history. Brazil is also the only country to have participated in every single FIFA World Cup since the tournament began in 1930. Football is deeply embedded in Brazilian culture and has produced legendary players like Pelé, Ronaldo, and Ronaldinho.",
+              "Brazil is the world's largest producer of coffee, accounting for about one-third of global coffee production. The country has been the top coffee producer for over 150 years, with coffee plantations covering approximately 27,000 square kilometers. Brazilian coffee culture is so strong that the average Brazilian drinks more coffee per capita than almost any other nationality.",
+              "The Christ the Redeemer statue in Rio de Janeiro stands 98 feet tall atop the 2,300-foot Corcovado Mountain and was voted one of the New Seven Wonders of the World in 2007. Built between 1922 and 1931, this Art Deco masterpiece is made of reinforced concrete and soapstone. The statue has become an iconic symbol of Brazil and Christianity worldwide.",
+              "Brazil spans four time zones and is the fifth-largest country in the world by both land area and population. It borders every South American country except Chile and Ecuador, sharing boundaries with 10 different nations. The country's territory covers nearly half of South America and includes diverse landscapes from tropical beaches to snow-capped mountains.",
+              "The Amazon River system in Brazil contains more fresh water than the next seven largest rivers combined. The river is approximately 4,000 miles long and during the rainy season can be up to 30 miles wide in some areas. The Amazon river system has over 1,100 tributaries and supports an incredible diversity of aquatic life including pink dolphins, piranhas, and giant river otters.",
+              "Brazil's Carnival celebration is the world's largest festival, attracting over 2 million people to Rio de Janeiro alone each year. The festival features elaborate parades, samba dancing, and colorful costumes that take months to prepare. Carnival has deep cultural roots in Brazilian society and represents a fusion of Portuguese, African, and indigenous traditions that date back centuries."
+            ]
+          },
+          {
+            name: "Egypt",
+            lat: 26.8206,
+            lng: 30.8025,
+            facts: [
+              "The Great Pyramid of Giza was the tallest man-made structure in the world for over 3,800 years, standing at 146.5 meters originally. Built around 2580-2560 BC as a tomb for Pharaoh Khufu, it contains approximately 2.3 million stone blocks, each weighing between 2.5 and 15 tons. The precision of its construction continues to amaze engineers and archaeologists today.",
+              "Ancient Egyptians invented paper (papyrus), ink made from soot and vegetable gum, and the 365-day calendar that forms the basis of our modern calendar system. They also developed one of the earliest forms of writing (hieroglyphics), advanced mathematics including geometry and algebra, and sophisticated medical practices including surgery and dentistry that influenced civilizations for millennia.",
+              "The Nile River is the longest river in the world at 4,132 miles, flowing through 11 countries before reaching the Mediterranean Sea in Egypt. For thousands of years, the Nile's annual flood cycle was crucial for Egyptian agriculture and civilization. The river continues to be Egypt's lifeline, providing water for irrigation, transportation, and hydroelectric power through the Aswan High Dam.",
+              "Egypt has more than 100 pyramids scattered across the desert, built over a span of nearly 1,000 years during the Old and Middle Kingdom periods. While the pyramids at Giza are the most famous, other significant pyramid complexes exist at Saqqara, Dahshur, and Meidum. These monuments represent the pinnacle of ancient Egyptian architecture and engineering achievement.",
+              "The ancient Library of Alexandria was one of the largest and most significant libraries of the ancient world, containing hundreds of thousands of papyrus scrolls on subjects ranging from mathematics and astronomy to medicine and literature. It served as a major center of scholarship and learning for over 600 years, attracting scholars from across the Mediterranean world until its gradual decline.",
+              "Egypt is home to the Suez Canal, one of the world's most important waterways that connects the Mediterranean and Red Seas. Opened in 1869, the canal handles about 12% of global trade and provides the shortest sea route between Europe and Asia. The canal generates significant revenue for Egypt and remains a crucial chokepoint for international maritime commerce.",
+              "The ancient Egyptians were master embalmers and the practice of mummification was so sophisticated that many mummies from 3,000 years ago are still remarkably well-preserved today. The process took 70 days and involved removing organs, drying the body with natron salt, and wrapping it in linen bandages. This practice reflected their complex beliefs about the afterlife and the soul's journey.",
+              "Egypt's Red Sea coast features some of the world's most spectacular coral reefs and marine biodiversity. The Red Sea is home to over 1,000 species of fish and 200 species of coral, many of which are found nowhere else on Earth. The crystal-clear waters and year-round warm temperatures make it one of the world's premier diving destinations."
+            ]
+          },
+          {
+            name: "Australia",
+            lat: -25.2744,
+            lng: 133.7751,
+            facts: [
+              "Australia is the only country that is also a continent, covering approximately 7.7 million square kilometers and making it the sixth-largest country in the world. It's surrounded by the Indian and Pacific Oceans and is separated from Asia by the Arafura and Timor Seas. The continent-country has a unique position in the Southern Hemisphere, giving it distinct seasons opposite to the Northern Hemisphere.",
+              "The Great Barrier Reef is the largest living structure on Earth, stretching over 2,300 kilometers along Australia's northeast coast. This UNESCO World Heritage site is home to 1,500 species of fish, 4,000 types of mollusk, and 400 species of coral. It's so large that it can be seen from space and supports a tourism industry worth billions of dollars annually.",
+              "Australia has more deadly animals than any other country, including the box jellyfish, blue-ringed octopus, funnel-web spider, and various venomous snakes like the taipan and death adder. Despite this reputation, actual deaths from these creatures are extremely rare due to effective antivenom and medical treatment. The country's isolation has led to unique evolutionary adaptations in its wildlife.",
+              "The Australian continent is moving north at approximately 2.7 inches (7 centimeters) per year due to tectonic plate movement. This movement is caused by the Indo-Australian Plate's collision with the Eurasian and Pacific Plates. Over millions of years, this movement has significantly altered Australia's position, and it continues to affect the country's geological activity and earthquake patterns.",
+              "Australia is home to the world's oldest continuous culture, with Aboriginal Australians having inhabited the continent for at least 65,000 years. There are over 250 distinct Aboriginal languages and more than 500 different clan groups, each with unique traditions, art styles, and spiritual beliefs. Their sophisticated understanding of land management and astronomy has been passed down through generations.",
+              "The Outback covers about 70% of Australia's landmass and is one of the most sparsely populated regions on Earth. This vast wilderness includes deserts, semi-arid regions, and remote settlements where some towns are hundreds of kilometers apart. The Outback is home to unique wildlife, ancient rock formations, and mining operations that extract gold, iron ore, and other valuable minerals.",
+              "Australia has some of the world's most unique animals, including marsupials like kangaroos, koalas, and wombats that carry their young in pouches. The country is also home to monotremes - egg-laying mammals like the platypus and echidna found nowhere else on Earth. About 80% of Australian animals are endemic, meaning they exist naturally nowhere else in the world.",
+              "Sydney Opera House is one of the world's most recognizable buildings and a UNESCO World Heritage Site that took 14 years to complete. Its distinctive shell-shaped design was inspired by orange segments and sailing ships. The building hosts over 1,600 performances annually and attracts more than 8 million visitors each year, making it Australia's most visited tourist attraction."
+            ]
+          },
+          {
+            name: "Norway",
+            lat: 60.4720,
+            lng: 8.4689,
+            facts: [
+              "Norway has the world's longest road tunnel, the Lærdal Tunnel, which stretches 15.2 miles (24.5 kilometers) through the mountains connecting Lærdal and Aurland. Completed in 2000, this engineering marvel took five years to build and cost $113 million. The tunnel features special lighting and air treatment systems to prevent driver fatigue and claustrophobia during the 20-minute journey through the mountain.",
+              "The country has more than 50,000 islands along its extensive coastline, which stretches for over 25,000 kilometers including all the fjords and islands. These islands range from tiny uninhabited rocks to substantial landmasses with thriving communities. The Lofoten Islands are particularly famous for their dramatic peaks rising directly from the sea and their traditional fishing villages.",
+              "Norway discovered oil in the North Sea in 1969, completely transforming its economy from one based on fishing, forestry, and shipping to one of the world's wealthiest nations. The country has used its oil wealth wisely, creating the world's largest sovereign wealth fund worth over $1.4 trillion. This fund ensures future generations will benefit from today's oil revenues.",
+              "The midnight sun phenomenon occurs in northern Norway for up to 76 consecutive days during summer, when the sun never sets below the horizon. Conversely, during winter, the same regions experience polar night where the sun doesn't rise for weeks. This extreme variation in daylight hours profoundly affects the lifestyle, culture, and psychology of people living in these regions.",
+              "Norway consistently ranks as one of the world's happiest countries and has the highest Human Development Index globally. The country offers free healthcare, free education including university, generous parental leave, and a strong social safety net. Norwegian society emphasizes work-life balance, with many businesses closing early on Fridays and offering flexible working arrangements to employees.",
+              "The Norwegian fjords are among the world's most spectacular natural formations, carved by glaciers over millions of years. Geirangerfjord and Nærøyfjord are UNESCO World Heritage Sites known for their dramatic waterfalls, steep cliffs, and pristine beauty. These fjords attract millions of tourists annually and serve as important symbols of Norwegian natural heritage and environmental conservation.",
+              "Norway is home to the Northern Lights (Aurora Borealis), best visible from September to March in the northern regions. This natural phenomenon occurs when charged particles from the sun interact with Earth's magnetic field, creating dancing curtains of green, blue, and sometimes red light across the night sky. The lights have inspired countless legends and continue to attract visitors from around the world.",
+              "Traditional Norwegian architecture includes distinctive stave churches, with 28 still surviving from medieval times. These wooden churches, built without nails using interlocking wooden posts, showcase remarkable craftsmanship and Viking-era building techniques. The intricate carvings and dragon-head decorations reflect the blend of Christian and Norse cultural influences that shaped medieval Norwegian society."
+            ]
+          },
+          {
+            name: "India",
+            lat: 20.5937,
+            lng: 78.9629,
+            facts: [
+              "India has 22 official languages recognized by the constitution and over 1,600 spoken languages throughout the country, making it one of the most linguistically diverse nations on Earth. Hindi and English serve as the primary languages for government and business, but each state often has its own official language. This linguistic diversity reflects India's rich cultural heritage and complex history of various civilizations.",
+              "The country produces approximately 70% of the world's spices, including cardamom, turmeric, coriander, and black pepper that have been traded for thousands of years. India's spice trade historically connected it to civilizations across Asia, the Middle East, and Europe. The diverse climate zones from tropical to temperate allow for cultivation of an enormous variety of spices that form the backbone of Indian cuisine.",
+              "India has the world's largest postal network with over 150,000 post offices, more than three times the number in China despite having a smaller land area. The Indian postal system delivers mail to remote villages in the Himalayas, desert regions, and tropical islands. This extensive network serves as a crucial communication lifeline for rural communities and supports various government services and banking operations.",
+              "The game of chess originated in India during the 6th century, originally called 'Chaturanga' meaning 'four divisions of the military' - infantry, cavalry, elephants, and chariotry. The game spread from India to Persia, then to the Islamic world and Europe, evolving into modern chess. India continues to be a chess powerhouse, producing world champions and grandmasters who compete at the highest international levels.",
+              "India is the world's largest democracy with over 900 million eligible voters, making its elections the largest democratic exercise in human history. The Election Commission of India manages this massive undertaking using electronic voting machines and deploying millions of poll workers across the country. Despite its complexity, India has maintained democratic traditions since independence in 1947.",
+              "The Indian railway system is one of the world's largest employers, with over 1.4 million employees operating trains across 67,000 kilometers of track. Every day, Indian railways carries about 23 million passengers, equivalent to moving the entire population of Australia. The system connects remote villages to major cities and serves as the backbone of India's transportation infrastructure.",
+              "India is home to the world's largest vegetarian population, with an estimated 400 million people following vegetarian diets for religious, cultural, or personal reasons. This dietary tradition is deeply rooted in Hindu, Jain, and Buddhist philosophies that emphasize non-violence toward animals. The prevalence of vegetarianism has created a sophisticated and diverse plant-based cuisine that influences global food trends.",
+              "The Kumbh Mela, held every 12 years in India, is the world's largest religious gathering, attracting over 100 million pilgrims. This festival rotates between four sacred cities and lasts for several months, with millions of people bathing in holy rivers on specific auspicious dates. The event showcases India's remarkable organizational capabilities and the enduring power of spiritual traditions in modern society."
+            ]
+          },
+          {
+            name: "Canada",
+            lat: 56.1304,
+            lng: -106.3468,
+            facts: [
+              "Canada has the longest coastline in the world at over 202,000 kilometers, touching three oceans: the Atlantic, Pacific, and Arctic. This extensive coastline includes countless bays, inlets, and fjords that provide habitat for diverse marine life. The coastline supports major fishing industries, shipping routes, and coastal communities, while also presenting unique challenges for navigation and environmental protection in harsh northern conditions.",
+              "There are more lakes in Canada than in the rest of the world combined, with an estimated 2 million lakes covering about 7.6% of the country's total land area. These lakes, formed primarily by glacial activity during the last ice age, provide fresh water, recreation, and transportation routes. The Great Lakes system alone contains about 20% of the world's fresh surface water.",
+              "Canada experiences the lowest gravity on Earth in the Hudson Bay region due to the geological effects of the last ice age and the area's unique geological composition. This gravitational anomaly, discovered through satellite measurements, is caused by the massive ice sheets that once covered the region, depressing the land and affecting the distribution of Earth's mass in this area.",
+              "Canadians consume more macaroni and cheese than any other country in the world, eating an average of 3.2 boxes per person annually. This comfort food has become deeply embedded in Canadian culture, with Kraft Dinner being particularly popular. The phenomenon reflects broader Canadian food culture that embraces both international influences and uniquely Canadian adaptations of global dishes.",
+              "Canada is officially bilingual with both English and French as official languages, reflecting its colonial history and cultural diversity. About 22% of Canadians speak French as their first language, primarily in Quebec and parts of New Brunswick. The country's bilingual policies ensure government services are available in both languages and protect French-Canadian cultural identity and linguistic rights.",
+              "The Canadian Arctic Archipelago consists of over 36,000 islands, making it one of the world's largest island groups. These islands, many of which are uninhabited, play a crucial role in Arctic ecology and climate regulation. The region is home to polar bears, Arctic foxes, and numerous seabird colonies, while also containing significant mineral resources and serving as important indicators of climate change.",
+              "Canada produces 71% of the world's pure maple syrup, with Quebec alone accounting for most of this production. The maple syrup industry is deeply rooted in Canadian heritage, originally learned from Indigenous peoples who discovered the process of tapping maple trees. The annual maple syrup harvest requires specific weather conditions and has become a symbol of Canadian identity worldwide.",
+              "The Trans-Canada Highway is the world's longest national highway system, stretching 7,821 kilometers from Victoria, British Columbia, to St. John's, Newfoundland. Completed in 1971, this highway connects all ten provinces and serves as a crucial transportation link for a country with vast distances between major cities. The highway passes through diverse landscapes from mountains to prairies to forests."
+            ]
+          },
+          {
+            name: "South Africa",
+            lat: -30.5595,
+            lng: 22.9375,
+            facts: [
+              "South Africa has 11 official languages, the most of any country in the world, reflecting its diverse cultural heritage and the government's commitment to linguistic inclusivity. These languages include Zulu, Xhosa, Afrikaans, English, Sesotho, Setswana, Sepedi, Xitsonga, siSwati, Tshivenda, and Ndebele. This multilingual approach helps preserve indigenous cultures while promoting national unity and communication across different ethnic groups.",
+              "South Africa is the only country to have hosted the FIFA World Cup (2010), Cricket World Cup (2003), and Rugby World Cup (1995), demonstrating its exceptional sporting infrastructure and organizational capabilities. The 2010 FIFA World Cup was particularly significant as the first held on the African continent, showcasing South Africa's ability to host major international events and promoting tourism and development.",
+              "The country has three capital cities: Pretoria (executive), Cape Town (legislative), and Bloemfontein (judicial), making it one of the few countries with multiple capitals. This unusual arrangement reflects historical compromises made during the formation of the Union of South Africa in 1910. Each city serves different governmental functions, with Parliament meeting in Cape Town while the President works from Pretoria.",
+              "The world's oldest human fossils have been found in South Africa, including specimens over 2 million years old from sites like the Cradle of Humankind near Johannesburg. These discoveries have provided crucial insights into human evolution and earned South Africa recognition as the birthplace of humanity. The fossil sites are UNESCO World Heritage Sites that continue to yield new discoveries about our ancestors.",
+              "South Africa is the world's largest producer of platinum, accounting for about 70% of global production. The country also has significant deposits of gold, diamonds, and other precious minerals that have shaped its economy and history. The mining industry, while providing substantial wealth, has also been central to the country's complex social and political development, including the apartheid system.",
+              "The country is home to the Big Five animals (lion, leopard, elephant, rhinoceros, and Cape buffalo) and has some of the world's most spectacular wildlife reserves, including Kruger National Park. South Africa's diverse ecosystems support an incredible variety of species, from penguins on the coast to large mammals in the savanna. Wildlife tourism is a major economic driver and conservation priority.",
+              "South Africa has the world's deepest commercial mine, the Mponeng Gold Mine, which extends 4 kilometers underground. Working at such depths presents extreme challenges including high temperatures, rock pressure, and the need for sophisticated ventilation systems. The mine employs thousands of workers and represents the pinnacle of deep-level mining technology and human endurance.",
+              "The country is known for its wine production, with the Cape Winelands region producing world-class wines for over 350 years. South African wine regions benefit from a Mediterranean climate and diverse soil types that create ideal conditions for viticulture. The industry has gained international recognition and contributes significantly to tourism, with wine routes attracting visitors from around the world."
+            ]
+          },
+          {
+            name: "Argentina",
+            lat: -38.4161,
+            lng: -63.6167,
+            facts: [
+              "Argentina was the first country to use fingerprints as a form of identification in criminal investigations, pioneering this forensic technique in 1892. Inspector Eduardo Alvarez solved a murder case using fingerprint evidence, establishing a precedent that would eventually be adopted worldwide. This innovation reflected Argentina's early adoption of modern scientific methods and its contribution to international law enforcement practices.",
+              "Argentina has the highest number of psychiatrists per capita in the world, with Buenos Aires alone having more psychologists than any other city globally. This phenomenon, known as 'psicología popular,' emerged in the mid-20th century when psychoanalysis became deeply integrated into Argentine culture. Mental health awareness and therapy are widely accepted parts of daily life for many Argentines.",
+              "The tango originated in Argentina in the late 1800s, emerging from the working-class neighborhoods of Buenos Aires through a fusion of African, European, and indigenous musical influences. Initially considered scandalous by the upper classes, tango evolved into a sophisticated art form that represents Argentine passion and melancholy. UNESCO recognized tango as an Intangible Cultural Heritage of Humanity in 2009.",
+              "Mount Aconcagua in Argentina is the tallest mountain outside of Asia, standing at 6,962 meters above sea level. Located in the Andes mountain range near the Chilean border, it's the highest peak in both the Western and Southern Hemispheres. The mountain attracts climbers from around the world, though its extreme altitude and weather conditions make it a challenging and dangerous ascent.",
+              "Argentina is famous for its beef production and has one of the world's highest per capita meat consumption rates. The country's pampas grasslands provide ideal conditions for cattle ranching, and Argentine beef is renowned globally for its quality and flavor. The traditional Argentine barbecue, called 'asado,' is more than just cooking - it's a social ritual that brings families and friends together.",
+              "The country is home to the world's widest river, the Río de la Plata, which forms the border between Argentina and Uruguay. This massive estuary, formed by the confluence of the Paraná and Uruguay rivers, is so wide that you cannot see across it from either shore. The river system is crucial for transportation, commerce, and freshwater supply for millions of people.",
+              "Argentina's Patagonia region contains some of the world's most spectacular glaciers, including the famous Perito Moreno Glacier in Los Glaciares National Park. This massive ice formation is one of the few glaciers in the world that is still advancing rather than retreating. The glacier is 250 square kilometers in area and produces dramatic ice calvings that attract tourists from around the world.",
+              "Buenos Aires has the world's widest avenue, Avenida 9 de Julio, which spans 140 meters across and has up to 22 lanes of traffic. Named after Argentina's Independence Day, this massive thoroughfare runs through the heart of the city and features the iconic Obelisk as its centerpiece. The avenue demonstrates the grand urban planning ambitions of early 20th-century Buenos Aires."
+            ]
+          },
+          {
+            name: "Indonesia",
+            lat: -0.7893,
+            lng: 113.9213,
+            facts: [
+              "Indonesia is made up of over 17,000 islands, making it the world's largest archipelago nation stretching across three time zones. Of these islands, only about 6,000 are inhabited, with Java being the most populous island containing over half the country's population. The vast archipelago spans more than 5,000 kilometers from east to west, creating incredible geographical and cultural diversity within a single nation.",
+              "Indonesia is home to the world's largest lizard, the Komodo dragon, which can grow up to 3 meters long and weigh over 70 kilograms. These ancient predators are found only on a few Indonesian islands including Komodo, Rinca, and Flores. Komodo dragons are apex predators with a venomous bite and can run up to 20 kilometers per hour, making them formidable hunters in their natural habitat.",
+              "The country has the third-largest tropical rainforest in the world, covering about 60% of its land area and containing approximately 10% of the world's known plant species. Indonesian rainforests are biodiversity hotspots that provide habitat for orangutans, tigers, elephants, and thousands of bird species. These forests play a crucial role in global climate regulation and carbon storage.",
+              "Indonesia has more active volcanoes than any other country, with over 130 active volcanic peaks as part of the Pacific Ring of Fire. The country experiences frequent volcanic activity, with Mount Merapi on Java being one of the most active and dangerous volcanoes in the world. Volcanic soil makes Indonesian land extremely fertile, supporting dense populations and productive agriculture.",
+              "The country is the world's largest producer of palm oil, accounting for about 60% of global production. Palm oil plantations cover millions of hectares across Indonesia, particularly in Sumatra and Borneo. While economically important, palm oil expansion has raised environmental concerns due to deforestation and habitat loss affecting orangutans and other wildlife species.",
+              "Indonesia is the world's fourth most populous country with over 270 million people representing more than 300 ethnic groups speaking over 700 languages. This incredible diversity is unified by the national language, Bahasa Indonesia, and the national motto 'Bhinneka Tunggal Ika' meaning 'Unity in Diversity.' The country successfully maintains national cohesion despite its vast cultural and linguistic differences.",
+              "The ancient Buddhist temple complex of Borobudur in Java is the world's largest Buddhist monument and a UNESCO World Heritage Site. Built in the 9th century, this massive structure contains over 2,600 relief panels and 500 Buddha statues. Borobudur represents the pinnacle of Buddhist art and architecture and attracts millions of visitors annually from around the world.",
+              "Indonesia straddles the equator and has a tropical climate with distinct wet and dry seasons that vary across the archipelago. The country's unique position between the Indian and Pacific Oceans creates diverse weather patterns and makes it a crucial component of global climate systems. This tropical location supports incredible biodiversity and makes Indonesia a key player in global environmental conservation efforts."
+            ]
+          },
+          {
+            name: "Germany",
+            lat: 51.1657,
+            lng: 10.4515,
+            facts: [
+              "Germany has over 1,500 different types of sausages, reflecting the country's regional culinary diversity and centuries-old meat-processing traditions. Each region has its own specialties, from Bavarian weisswurst to Thuringian bratwurst to currywurst from Berlin. This sausage variety represents Germany's decentralized history, where different kingdoms and principalities developed their own distinct food cultures that persist today.",
+              "Germany is home to the world's narrowest street, Spreuerhofstraße in Reutlingen, which measures just 31 centimeters (12.2 inches) at its narrowest point. This medieval alley, built in 1727, was created to connect two buildings and has become a popular tourist attraction. The street demonstrates the efficient use of space in historic European city centers and medieval urban planning.",
+              "In Bavaria, beer is legally considered a food rather than just a beverage, reflecting the deep cultural significance of beer in German society. The German Beer Purity Law (Reinheitsgebot) from 1516 is the world's oldest food safety regulation still in effect, mandating that beer can only contain water, hops, and malt. Germany has over 1,300 breweries producing more than 5,000 different beer varieties.",
+              "The Christmas tree tradition originated in Germany during the 16th century, initially in the Alsace region (then part of the Holy Roman Empire). German immigrants brought this tradition to other countries, and it eventually became a global Christmas symbol. The first Christmas markets also started in Germany, with Dresden's Striezelmarkt dating back to 1434, making it one of the oldest Christmas markets in the world.",
+              "Germany is the economic powerhouse of Europe, with the largest economy in the European Union and the fourth-largest globally. The country is known for its advanced manufacturing, particularly in automobiles, machinery, and chemicals. German engineering and precision have become synonymous with quality worldwide, with brands like BMW, Mercedes-Benz, and Volkswagen representing German automotive excellence.",
+              "The country is a leader in renewable energy, particularly wind and solar power, with renewable sources providing over 40% of electricity generation. Germany's Energiewende (energy transition) policy aims to phase out nuclear power and reduce carbon emissions through massive investment in clean energy infrastructure. This commitment to sustainability has made Germany a global leader in environmental technology and policy.",
+              "Germany has produced more Nobel Prize winners than any other country except the United States, with over 100 laureates in various fields including physics, chemistry, medicine, and literature. This reflects the country's strong tradition of scientific research and education, with institutions like the Max Planck Society and numerous prestigious universities contributing to global knowledge and innovation.",
+              "The Berlin Wall, which divided East and West Berlin from 1961 to 1989, became one of the most powerful symbols of the Cold War. Its fall in 1989 marked the beginning of German reunification and the end of the Soviet era in Eastern Europe. Today, remnants of the wall serve as memorials and tourist attractions, reminding visitors of Germany's complex 20th-century history and the triumph of freedom over oppression."
+            ]
+          },
+          {
+            name: "United Kingdom",
+            lat: 55.3781,
+            lng: -3.4360,
+            facts: [
+              "London houses over 170 museums, making it one of the world's greatest cultural capitals. The British Museum alone contains over 8 million artifacts spanning human history, from ancient Egyptian mummies to Greek sculptures. Many museums offer free admission, including the Tate Modern, National Gallery, and Natural History Museum, attracting millions of visitors annually.",
+              "Big Ben is actually the nickname for the largest bell inside the Elizabeth Tower at Westminster Palace, not the clock tower itself. The tower was renamed Elizabeth Tower in 2012 to honor Queen Elizabeth II's Diamond Jubilee. The bell weighs 13.7 tons and chimes every hour, with its distinctive sound heard across central London.",
+              "The Queen legally owns all unmarked swans in open water across England and Wales, a tradition dating back to the 12th century. This ancient right, known as 'swan ownership,' was originally about protecting these birds as a valuable food source for royal banquets. Today, an annual ceremony called 'Swan Upping' counts and marks swans on the Thames.",
+              "There are approximately 175 million chickens in the UK compared to about 67 million humans, making chickens outnumber people nearly 3 to 1. The UK produces around 1.2 billion eggs annually, with the average British person consuming about 200 eggs per year. This massive poultry industry supports both egg production and meat consumption across the country.",
+              "The London Underground, opened in 1863, was the world's first underground railway system and remains one of the most extensive metro networks globally. With 272 stations across 11 lines covering 402 kilometers, it carries over 5 million passengers daily. The system's iconic roundel logo and 'Mind the Gap' announcements have become cultural symbols recognized worldwide.",
+              "Stonehenge, built around 5,000 years ago, predates both the Egyptian pyramids and Rome's Colosseum by over 1,000 years. This mysterious stone circle in Wiltshire consists of massive sarsen stones weighing up to 25 tons each, transported from quarries 20 miles away. Archaeological evidence suggests it served as an ancient burial ground and astronomical observatory.",
+              "The English language contains more words than any other language, with over 170,000 words currently in use and thousands more obsolete terms. Shakespeare alone contributed over 1,700 words to the English language, including 'bedroom,' 'fashionable,' and 'lonely.' Regional British dialects add even more diversity, with some areas having completely unique vocabularies.",
+              "British people consume approximately 165 million cups of tea daily, making tea consumption a defining cultural characteristic. The afternoon tea tradition, complete with scones, sandwiches, and clotted cream, was popularized by Anna, Duchess of Bedford, in the 1840s. Tea imports transformed British society and influenced global trade patterns for centuries."
+            ]
+          },
+          {
+            name: "China",
+            lat: 35.8617,
+            lng: 104.1954,
+            facts: [
+              "Despite spanning 5,200 kilometers from east to west, China operates on a single time zone (China Standard Time), creating unusual daylight patterns across the country. In western regions like Xinjiang, sunrise can occur as late as 10 AM local time, while eastern cities experience more conventional schedules. This policy promotes national unity but creates practical challenges.",
+              "China operates the world's largest high-speed rail network, with over 40,000 kilometers of track connecting major cities at speeds up to 350 km/h. The system, built primarily since 2008, has revolutionized domestic travel and reduced flight demand. Trains like the CRH380A can complete the 1,318-kilometer Beijing-Shanghai journey in just 4.5 hours.",
+              "Ice cream was likely invented in ancient China around 200 BC, when a mixture of milk, rice, and snow was packed in snow to freeze. Chinese emperors enjoyed these early frozen desserts flavored with various fruits and spices. The concept later spread along trade routes to the Middle East and eventually reached Europe through explorers like Marco Polo.",
+              "The Great Wall isn't a single continuous wall but rather a network of walls, fortifications, and barriers built by different dynasties over 2,000 years. The Ming Dynasty sections, most familiar to tourists, represent only a fraction of the total construction. The combined length of all walls and branches exceeds 21,000 kilometers, earning it the nickname 'the longest cemetery on earth.'",
+              "China is home to the world's largest population of giant pandas, with approximately 1,864 individuals living in the wild and 600 in captivity. These beloved bears exist naturally only in the bamboo forests of central China's mountains. Conservation efforts have successfully increased their numbers, leading to their reclassification from 'endangered' to 'vulnerable' status in 2016.",
+              "The Terracotta Army, discovered in 1974 near Xi'an, contains over 8,000 life-sized warrior statues buried with China's first emperor, Qin Shi Huang. Each statue has unique facial features and expressions, showcasing incredible craftsmanship from over 2,200 years ago. The discovery revolutionized understanding of ancient Chinese military organization and artistic capabilities.",
+              "Traditional Chinese medicine, practiced for over 3,000 years, encompasses acupuncture, herbal remedies, and qi manipulation techniques. This medical system treats ailments by balancing the body's energy flow through specific points and natural substances. Modern research has validated many traditional treatments, leading to global integration of Chinese medical practices.",
+              "China produces and consumes more tea than any other country, with over 2.4 million tons annually across varieties like green, black, oolong, and pu-erh. The tea ceremony, an integral part of Chinese culture, emphasizes mindfulness, respect, and social harmony. Tea cultivation began in China over 4,000 years ago and remains central to daily life and hospitality."
+            ]
+          },
+          {
+            name: "Russia",
+            lat: 61.5240,
+            lng: 105.3188,
+            facts: [
+              "Russia spans 11 time zones across its vast 17.1 million square kilometers, making it the world's largest country by land area. From Kaliningrad in the west to Kamchatka in the east, the time difference reaches 10 hours. This enormous expanse covers nearly twice the land area of the United States and includes diverse climates from arctic tundra to subtropical beaches.",
+              "Lake Baikal, the world's deepest and oldest freshwater lake, contains approximately 20% of Earth's unfrozen fresh water supply. At 1,642 meters deep and 25 million years old, this Siberian lake holds more water than all North American Great Lakes combined. Its unique ecosystem includes over 3,000 species, with 2,000 found nowhere else on Earth.",
+              "Oymyakon, a small town in Siberia, holds the record as the coldest permanently inhabited place on Earth, with winter temperatures dropping to -71°C (-96°F). Despite extreme conditions, about 500 people live there year-round, dealing with challenges like cars that must run continuously and ground too frozen for traditional burials. The town name means 'non-freezing water' in the local language.",
+              "The Trans-Siberian Railway, completed in 1916, stretches 9,289 kilometers from Moscow to Vladivostok, making it the longest railway line in the world. This engineering marvel crosses eight time zones and takes about seven days to complete. The railway opened up Siberia for development and remains crucial for transporting goods between Europe and Asia.",
+              "Russia possesses the world's largest forest reserves, with taiga covering approximately 60% of the country's territory. These boreal forests contain an estimated 640 billion trees and play a crucial role in global climate regulation by absorbing massive amounts of carbon dioxide. The Russian taiga produces about 20% of the world's oxygen and significantly influences global weather patterns.",
+              "The Moscow Metro, opened in 1935, features some of the world's most beautiful subway stations, often called 'underground palaces.' Stations like Komsomolskaya and Mayakovskaya showcase stunning mosaics, chandeliers, and marble columns that rival art museums. During World War II, these stations served as bomb shelters, protecting thousands of Muscovites from air raids.",
+              "Russia is home to the world's largest diamond mine, the Mirny Diamond Mine in Siberia, which is so large that helicopters cannot fly over it due to dangerous air currents. The open-pit mine reaches 525 meters deep and 1,200 meters wide, producing approximately 2 million carats of diamonds annually. The surrounding town of Mirny was built specifically to support mining operations.",
+              "Russian ballet, particularly the Bolshoi and Mariinsky theaters, has produced legendary dancers and choreographers who revolutionized the art form worldwide. Classic ballets like 'Swan Lake,' 'The Nutcracker,' and 'Sleeping Beauty' were created by Russian composers and continue to captivate audiences globally. The rigorous Russian training method has influenced ballet schools and companies across all continents."
+            ]
+          },
+          {
+            name: "Mexico",
+            lat: 23.6345,
+            lng: -102.5528,
+            facts: [
+              "Mexico introduced chocolate, chilies, and corn to the world, fundamentally changing global cuisine and agriculture. Cacao beans were so valuable to the Aztecs that they used them as currency, with 100 beans equaling one turkey. When Spanish conquistadors brought these ingredients to Europe in the 16th century, they revolutionized cooking traditions and created new culinary possibilities across continents.",
+              "Cuexcomate, located in Puebla, stands as the world's smallest volcano at just 13 meters tall, small enough to climb with a simple staircase. Despite its tiny size, this geological formation was created by volcanic activity and demonstrates how diverse Mexico's volcanic landscape can be. Visitors can walk to the bottom of its crater, making it a unique tourist attraction.",
+              "The Day of the Dead (Día de los Muertos) celebration, recognized by UNESCO as a Masterpiece of Oral and Intangible Heritage of Humanity, honors deceased loved ones with colorful altars, sugar skulls, and marigold flowers. This ancient tradition, blending pre-Hispanic and Catholic influences, occurs November 1-2 annually and celebrates death as a natural part of life's cycle rather than mourning it.",
+              "Mexico City is sinking at an alarming rate of approximately 10 inches per year due to excessive groundwater extraction from the ancient lake bed beneath the city. Built on the former Aztec capital Tenochtitlan, which sat in the middle of Lake Texcoco, the city's 21 million residents have depleted underground aquifers, causing dramatic subsidence and infrastructure damage throughout the metropolitan area.",
+              "Mexico is home to 68 indigenous languages, making it one of the most linguistically diverse countries in the Americas. Nahuatl, the language of the Aztecs, is still spoken by over 1.7 million people today. These languages contribute words to Spanish and English, including 'chocolate,' 'tomato,' 'avocado,' and 'coyote,' demonstrating indigenous cultures' lasting influence on global vocabulary.",
+              "The ancient Mayan civilization developed one of the world's most accurate calendar systems, more precise than the Julian calendar used in Europe at the time. Their complex mathematical and astronomical knowledge allowed them to predict eclipses and planetary movements with remarkable accuracy. Mayan ruins like Chichen Itza and Palenque showcase sophisticated architecture and scientific achievements that continue to amaze researchers.",
+              "Mexico produces over 50% of the world's silver, making it the largest silver producer globally for centuries. The colonial city of Taxco, known as the 'Silver Capital,' built its entire economy around silver mining and craftsmanship. Mexican silver jewelry and decorative arts are renowned worldwide for their quality and intricate designs, supporting thousands of artisan families.",
+              "Mexican cuisine was declared a UNESCO Intangible Cultural Heritage of Humanity, recognizing its complex flavors, traditional techniques, and cultural significance. The cuisine combines indigenous ingredients like corn, beans, and squash with Spanish influences, creating dishes like mole, which can contain over 20 ingredients. Regional variations reflect Mexico's diverse geography and cultural heritage across 31 states."
+            ]
+          },
+          {
+            name: "Italy",
+            lat: 41.8719,
+            lng: 12.5674,
+            facts: [
+              "Italy boasts 58 UNESCO World Heritage Sites, more than any other country, representing an unparalleled concentration of cultural and historical treasures. From the ancient ruins of Pompeii to the Renaissance art of Florence, these sites showcase 3,000 years of continuous civilization. The Vatican City alone contains masterpieces by Michelangelo, Raphael, and Bernini that attract millions of pilgrims and art lovers annually.",
+              "Pizza was invented in Naples during the 1700s, originally as a simple flatbread topped with tomatoes, oil, and garlic for working-class people. The iconic Pizza Margherita, featuring tomato, mozzarella, and basil to represent the Italian flag, was created in 1889 to honor Queen Margherita of Savoy. Today, authentic Neapolitan pizza-making is protected by UNESCO as an intangible cultural heritage.",
+              "Venice is gradually sinking at a rate of 1-2 millimeters per year due to natural subsidence, rising sea levels, and the weight of its buildings on soft sediments. Built on 118 small islands connected by over 400 bridges, this unique city faces increasing threats from 'acqua alta' (high water) floods. The MOSE flood barrier system, completed in 2020, helps protect the city during extreme tides.",
+              "Italy's distinctive boot shape extends 1,200 kilometers into the Mediterranean Sea, with the Alps forming a natural border with France, Switzerland, Austria, and Slovenia. This peninsula contains two independent microstates: Vatican City (0.17 square miles) and San Marino (24 square miles), both completely surrounded by Italian territory. The country's geography creates diverse climates from Alpine conditions to Mediterranean warmth.",
+              "The Roman Empire, centered in Italy, created architectural and engineering marvels that still influence modern construction techniques. The Pantheon in Rome, built in 126 AD, remains the world's largest unreinforced concrete dome after nearly 2,000 years. Roman innovations like aqueducts, roads, and concrete enabled the empire to span three continents and continue to inspire engineers today.",
+              "Italian is considered the language closest to Latin, preserving many ancient Roman linguistic features while evolving into a melodious modern tongue. The standardized Italian language is based on the Tuscan dialect used by Dante, Petrarch, and Boccaccio in their literary masterpieces. Regional dialects vary so significantly that speakers from different regions sometimes struggle to understand each other without standard Italian.",
+              "The Italian Renaissance, beginning in the 14th century, revolutionized art, science, and philosophy throughout Europe and beyond. Leonardo da Vinci, Michelangelo, and Raphael created timeless masterpieces while advancing human understanding of anatomy, engineering, and perspective. This cultural movement, centered in Florence, Rome, and Venice, laid the foundation for modern Western civilization and continues to influence contemporary art and thought.",
+              "Italy produces more wine than any other country, with over 4 billion liters annually from diverse regions like Tuscany, Piedmont, and Veneto. The country recognizes over 400 different wine varieties, from robust Chianti to sparkling Prosecco, each reflecting unique terroir and centuries-old winemaking traditions. Italian wine culture emphasizes pairing specific wines with regional cuisines, creating perfect harmony between food and beverage."
+            ]
+          }
+
+        ],
+        bizarre: [
+          {
+            name: "Japan",
+            lat: 35.6895,
+            lng: 139.6917,
+            facts: [
+              {
+                history: "In 1600, samurai Miyamoto Musashi won a duel using only a wooden sword carved from an oar while his opponent used a steel katana.",
+                animal: {
+                  name: "Japanese Giant Salamander",
+                  scientific: "Andrias japonicus",
+                  bizarreFact: "Can live over 150 years and breathe through their skin. They're so ugly they're considered 'living fossils' and can grow up to 5 feet long."
+                }
+              },
+              {
+                history: "During WWII, Japan released over 9,000 balloon bombs across the Pacific Ocean, with some reaching as far as Michigan. Only one caused casualties - a family picnic in Oregon.",
+                animal: {
+                  name: "Japanese Spider Crab",
+                  scientific: "Macrocheira kaempferi",
+                  bizarreFact: "Has a leg span of up to 12 feet and can live for 100 years. They decorate their shells with sponges and other sea creatures as camouflage, essentially becoming living gardens."
+                }
+              },
+              {
+                history: "In 1703, the entire city of Edo (now Tokyo) was rebuilt after the Great Fire using a revolutionary urban planning system that included designated fire breaks and standardized roof tiles.",
+                animal: {
+                  name: "Yaku Shima Macaque",
+                  scientific: "Macaca fuscata yakui",
+                  bizarreFact: "These monkeys have learned to wash sweet potatoes in salt water before eating them, and this behavior spread through the entire population like a cultural revolution."
+                }
+              },
+              {
+                history: "The world's first novel, 'The Tale of Genji,' was written by a Japanese woman named Murasaki Shikibu in 1008 AD, predating European novels by centuries.",
+                animal: {
+                  name: "Japanese Rhinoceros Beetle",
+                  scientific: "Trypoxylus dichotomus",
+                  bizarreFact: "Can lift objects 850 times their own body weight and are so popular as pets that champion fighting beetles sell for thousands of dollars. They're considered the 'strongest animals on Earth' relative to size."
+                }
+              },
+              {
+                history: "In 1274, a massive typhoon called 'kamikaze' (divine wind) destroyed Kublai Khan's invasion fleet, saving Japan from Mongol conquest with over 13,000 ships sunk.",
+                animal: {
+                  name: "Japanese Flying Squirrel",
+                  scientific: "Pteromys momonga",
+                  bizarreFact: "Has enormous pink eyes that take up 50% of their skull space and can glide up to 100 meters between trees. They're so cute they inspired the Pokémon character Emolga."
+                }
+              },
+              {
+                history: "The Japanese art of sword folding created katanas so sharp they could slice through silk scarves dropped onto the blade, achieved by folding steel up to 65,000 times.",
+                animal: {
+                  name: "Japanese Serow",
+                  scientific: "Capricornis crispus",
+                  bizarreFact: "This goat-antelope hybrid marks its territory with scent glands near its eyes and can climb completely vertical cliff faces. They're living relics from the Ice Age."
+                }
+              },
+              {
+                history: "During the Edo period, Japan had a completely closed border policy for 220 years (1633-1853), during which time the population developed a unique culture with zero foreign influence.",
+                animal: {
+                  name: "Mandarin Duck",
+                  scientific: "Aix galericulata",
+                  bizarreFact: "Males grow completely different feathers twice a year - brilliant rainbow colors for mating season, then dull brown for safety. They're considered the most beautiful waterfowl in the world."
+                }
+              },
+              {
+                history: "The 2011 Tōhoku earthquake was so powerful it moved the entire island of Honshu 8 feet eastward and shifted the Earth's axis by 4 inches, shortening days by 1.8 microseconds.",
+                animal: {
+                  name: "Japanese Giant Hornet",
+                  scientific: "Vespa mandarinia",
+                  bizarreFact: "Can fly at 25 mph and has a 6mm stinger that injects venom capable of dissolving human tissue. A single hornet can kill 40 European honeybees per minute."
+                }
+              },
+              {
+                history: "In 1945, two Japanese soldiers continued fighting WWII until 1974, hiding in the Philippines jungle for 29 years because they didn't believe the war had ended.",
+                animal: {
+                  name: "Japanese Weasel",
+                  scientific: "Mustela itatsi",
+                  bizarreFact: "Can rotate their heads 180 degrees and have such flexible spines they can turn around completely inside a tube their own width. They're basically furry contortionists."
+                }
+              },
+              {
+                history: "The ancient Japanese practice of 'forest bathing' (shinrin-yoku) has been scientifically proven to boost immune systems by increasing natural killer cell activity by 50%.",
+                animal: {
+                  name: "Japanese Copper Pheasant",
+                  scientific: "Syrmaticus soemmerringii",
+                  bizarreFact: "Males perform elaborate mating dances while making sounds like a motorcycle engine, and their tail feathers can grow up to 5 feet long - longer than their entire body."
+                }
+              }
+            ]
+          },
+          {
+            name: "Brazil",
+            lat: -14.235,
+            lng: -51.9253,
+            facts: [
+              {
+                history: "In 1932, the city of São Paulo literally declared war on the rest of Brazil in the Constitutionalist Revolution. Citizens armed themselves with improvised weapons, even tossing bombs made from coffee cans off rooftops. The rebellion lasted 87 days and involved over 200,000 troops, yet ended in defeat. Ironically, although they lost militarily, the rebels eventually won the constitutional reforms they were demanding.",
+                animal: {
+                  name: "Candiru Fish",
+                  scientific: "Vandellia cirrhosa",
+                  bizarreFact: "This tiny parasitic catfish has been accused of swimming up urine streams into the human urethra. Once inside, its spiny body lodges into flesh, requiring surgical removal. While rare, its reputation is legendary in the Amazon."
+                }
+              },
+              {
+                history: "Brazil built an entire modernist city — Brasília — from scratch in under 4 years during the 1950s. Designed to look like an airplane from above, its surreal layout defied logic: it had almost no traffic lights, and residential areas were organized by assigned sectors rather than street names.",
+                animal: {
+                  name: "Maned Wolf",
+                  scientific: "Chrysocyon brachyurus",
+                  bizarreFact: "This long-legged fox-like creature isn’t a fox or wolf — it’s its own species. It smells like cannabis and communicates by peeing on termite mounds. Locals call it the 'fox on stilts.'"
+                }
+              },
+              {
+                history: "During Carnival in Rio, the city consumes over 800 million liters of beer in less than a week. In fact, beer trucks form their own 'beer block' parade to resupply drinkers, escorted by police and samba dancers.",
+                animal: {
+                  name: "Glass Frog",
+                  scientific: "Hyalinobatrachium fleischmanni",
+                  bizarreFact: "Its belly is completely transparent — you can see its beating heart and organs through its skin. Scientists study it to better understand human organ transparency and camouflage."
+                }
+              },
+              {
+                history: "In the 1970s, Brazil tried to relocate its capital for the second time by floating artificial islands in the Amazon River. The experimental city, Fordlândia, built by Henry Ford decades earlier, had already failed due to rubber trees being eaten alive by bugs.",
+                animal: {
+                  name: "Amazonian Royal Flycatcher",
+                  scientific: "Onychorhynchus coronatus",
+                  bizarreFact: "It looks like a plain brown bird until startled — then it fans out a neon-red crown that looks like a mohawk made of fire."
+                }
+              },
+              {
+                history: "In 1560, Portuguese explorers discovered a group of indigenous people who made ceremonial beer by chewing cassava, spitting it into pots, and fermenting it with their saliva. The drink, called 'cauim,' is still made in remote Amazon tribes today.",
+                animal: {
+                  name: "Brazilian Wandering Spider",
+                  scientific: "Phoneutria nigriventer",
+                  bizarreFact: "Its venom can cause intense pain — and spontaneous, hours-long erections in men. Pharmaceutical companies study it for erectile dysfunction treatments."
+                }
+              },
+              {
+                history: "The Amazon River reverses direction several times a year due to a tidal wave called the 'Pororoca'. This wave can travel inland for 500 miles and is so powerful surfers ride it through the jungle.",
+                animal: {
+                  name: "Electric Eel",
+                  scientific: "Electrophorus electricus",
+                  bizarreFact: "It’s not actually an eel, but a knifefish. It can produce up to 860 volts — strong enough to knock a horse unconscious. Some use electric shocks to navigate or hunt in pitch-black waters."
+                }
+              },
+              {
+                history: "In a bizarre 1980s police case, dozens of mutilated cow carcasses were found around a town in Minas Gerais with surgically precise cuts and no blood. Locals blamed aliens, and the 'Chupacabra panic' gripped rural Brazil for years.",
+                animal: {
+                  name: "Potoo Bird",
+                  scientific: "Nyctibius griseus",
+                  bizarreFact: "This bird looks like a broken tree branch and has eyes so large they glow at night. When threatened, it freezes in place, pretending to be a stump. It’s the master of bizarre camouflage."
+                }
+              },
+              {
+                history: "In the jungle town of Belém, there's a church that hosts the world's largest religious procession — over 2 million people flood the streets barefoot each October for the Círio de Nazaré, pulling a sacred rope for miles.",
+                animal: {
+                  name: "Tamarin Monkey",
+                  scientific: "Saguinus imperator",
+                  bizarreFact: "This monkey sports a handlebar mustache so perfectly curled it looks like a 19th-century nobleman. It uses facial expressions to communicate emotions like jealousy and fear."
+                }
+              },
+              {
+                history: "Brazil has a ghost town built on stilts that rises and sinks with the Amazon River. The town of Anavilhanas, once bustling with rubber trade, vanishes under floodwaters every year and resurfaces months later like nothing happened.",
+                animal: {
+                  name: "Giant River Otter",
+                  scientific: "Pteronura brasiliensis",
+                  bizarreFact: "Up to 6 feet long, these otters hunt in packs, scream like banshees, and wrestle caimans for fish. They’re so fierce locals call them 'river wolves.'"
+                }
+              },
+              {
+                history: "Brazil once ran a lottery based on animal fights, and people bet on results based on dreams. If you dreamt of a snake, you'd bet on number 33. Despite being banned, this 'jogo do bicho' system still thrives illegally.",
+                animal: {
+                  name: "Capybara",
+                  scientific: "Hydrochoerus hydrochaeris",
+                  bizarreFact: "The world’s largest rodent is oddly chill — it gets along with crocodiles, monkeys, birds, and even sits in hot springs. It's the internet’s favorite zen master of the animal world."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Egypt",
+            lat: 26.8206,
+            lng: 30.8025,
+            facts: [
+              {
+                history: "Cleopatra VII, Egypt’s final pharaoh, lived closer in time to the moon landing (1969) than to the construction of the Great Pyramid. Despite being remembered as Egyptian, she was actually Macedonian Greek — a descendant of Ptolemy, Alexander the Great’s general. She spoke nine languages and ruled during Rome’s turbulent transformation into an empire, allying romantically and politically with both Julius Caesar and Mark Antony.",
+                animal: {
+                  name: "Egyptian Fruit Bat",
+                  scientific: "Rousettus aegyptiacus",
+                  bizarreFact: "They navigate using tongue clicks — a form of echolocation. Even stranger, male fruit bats lactate and nurse the young, a rare trait among mammals."
+                }
+              },
+              {
+                history: "Ancient Egyptians mummified not just humans, but also animals — including cats, ibises, crocodiles, baboons, and bulls. One tomb contained over 8 million mummified dogs, offered as sacrifices to Anubis, god of the dead. Some temples even bred animals specifically to be sacrificed and wrapped up like divine offerings.",
+                animal: {
+                  name: "Sacred Ibis",
+                  scientific: "Threskiornis aethiopicus",
+                  bizarreFact: "Once worshipped as a symbol of wisdom and the god Thoth, the ibis was often mummified by the thousands. Today, some have escaped zoos and formed wild colonies in Europe."
+                }
+              },
+              {
+                history: "Pharaoh Pepi II reportedly hated flies so much, he covered naked slaves in honey just to lure the insects away from him. He reigned for 94 years, the longest reign of any monarch in history — starting at age 6.",
+                animal: {
+                  name: "Deathstalker Scorpion",
+                  scientific: "Leiurus quinquestriatus",
+                  bizarreFact: "Its venom is among the most potent of all scorpions — but in tiny doses, it's being studied for targeting brain tumors in medical research."
+                }
+              },
+              {
+                history: "Ancient Egyptians used a calendar based on the flooding of the Nile, which they predicted using the heliacal rising of Sirius — the brightest star in the night sky. This system led to the creation of a 365-day year, long before the Romans adopted it.",
+                animal: {
+                  name: "Nile Crocodile",
+                  scientific: "Crocodylus niloticus",
+                  bizarreFact: "Ancient Egyptians worshipped it as the god Sobek and kept them in temples, adorning some with jewelry and mummifying others for the afterlife."
+                }
+              },
+              {
+                history: "In 2018, archaeologists discovered a black sarcophagus buried for over 2,000 years. Rumors of a curse flooded the internet. When opened, it contained sewage water and three skeletons, prompting some to ironically demand to 'bottle the mummy juice and sell it as an energy drink.'",
+                animal: {
+                  name: "Jerboa",
+                  scientific: "Jaculus jaculus",
+                  bizarreFact: "This desert rodent looks like a mouse crossed with a kangaroo and can leap over 9 feet in a single bound despite being the size of a plum."
+                }
+              },
+              {
+                history: "Tutankhamun’s tomb contained a meteorite dagger — literally made from iron that fell from space. The ancient Egyptians prized meteoric metal and called it ‘iron from the sky,’ using it long before iron smelting was invented.",
+                animal: {
+                  name: "Fennec Fox",
+                  scientific: "Vulpes zerda",
+                  bizarreFact: "Its ears are so big they help dissipate heat and detect underground insects. At night, it uses its paws like snowshoes to walk silently over sand dunes."
+                }
+              },
+              {
+                history: "Pharaoh Akhenaten tried to erase Egypt’s entire pantheon and force monotheism — worship of the sun disc Aten. He even moved the capital to a new city, Amarna. After his death, his reforms were swiftly reversed and his name nearly wiped from history… until his son, Tutankhamun, restored the old gods.",
+                animal: {
+                  name: "Dung Beetle (Scarab)",
+                  scientific: "Scarabaeus sacer",
+                  bizarreFact: "Egyptians saw it as a symbol of rebirth. It rolls dung into balls not just for food, but also to lay eggs — its young literally hatch from poop."
+                }
+              },
+              {
+                history: "In 525 BCE, Persian invaders used cats as shields, knowing Egyptians revered them. Egyptian soldiers reportedly surrendered rather than risk harming the sacred animals. The ploy worked — the Persians captured the city without a fight.",
+                animal: {
+                  name: "Caracal",
+                  scientific: "Caracal caracal",
+                  bizarreFact: "This sleek wild cat has ears longer than its face and can leap over 10 feet in the air to snatch birds mid-flight. Some were trained as royal hunting companions."
+                }
+              },
+              {
+                history: "The ancient city of Heracleion — once larger than Alexandria — sank into the Mediterranean over 1,000 years ago. Rediscovered in 2000, it was perfectly preserved underwater, complete with statues, temples, and treasure now being slowly excavated.",
+                animal: {
+                  name: "Tilapia",
+                  scientific: "Oreochromis niloticus",
+                  bizarreFact: "Nile tilapia were sacred symbols of rebirth. Oddly, they brood their eggs in their mouths — including after hatching — spitting out fry like popcorn."
+                }
+              },
+              {
+                history: "Egypt’s ancient pregnancy test involved urinating on wheat and barley seeds. If the wheat sprouted — it meant a girl. If barley — a boy. If nothing grew, not pregnant. Modern science shows this test had a 70% accuracy rate thanks to hormonal effects on germination.",
+                animal: {
+                  name: "Camel Spider",
+                  scientific: "Galeodes arabs",
+                  bizarreFact: "Not technically a spider, but terrifying nonetheless. They can run 10 mph, make screaming sounds, and were rumored to chase soldiers — mostly myth, but still nightmare fuel."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Australia",
+            lat: -25.2744,
+            lng: 133.7751,
+            facts: [
+              {
+                history: "In 1932, Australia waged an actual war against emus. After soldiers armed with machine guns failed to curb the population of flightless birds destroying farmland, the emus won. The military retreated. Parliament never officially ended the 'Great Emu War' — making it one of history’s weirdest defeats.",
+                animal: {
+                  name: "Drop Bear",
+                  scientific: "Thylarctos plummetus",
+                  bizarreFact: "A fictional apex predator — Australians tell tourists these giant carnivorous koalas drop from trees onto unsuspecting hikers. Despite being fake, signs warning of them are posted in parks just to mess with visitors."
+                }
+              },
+              {
+                history: "In 1979, parts of the U.S. space station Skylab fell over Western Australia. The town of Esperance fined NASA $400 for littering — a bill NASA ignored until a radio show paid it 30 years later.",
+                animal: {
+                  name: "Platypus",
+                  scientific: "Ornithorhynchus anatinus",
+                  bizarreFact: "This egg-laying mammal has venomous ankle spurs, a bill that senses electricity, and no stomach. Early scientists thought it was a hoax stitched together from other animals."
+                }
+              },
+              {
+                history: "The town of Coober Pedy exists almost entirely underground. Residents live in 'dugouts' carved into old opal mines to escape 120°F (50°C) surface heat. Even churches and bars are buried below ground in this real-life desert Hobbiton.",
+                animal: {
+                  name: "Thorny Devil",
+                  scientific: "Moloch horridus",
+                  bizarreFact: "Covered in spikes and fake heads, it drinks through its skin — collecting morning dew through capillaries between its scales. It’s a living cactus-lizard hybrid."
+                }
+              },
+              {
+                history: "In 1859, a man named Thomas Austin released 24 rabbits for hunting on his farm. They multiplied into 600 million in under a century, devastating ecosystems. Australia built a 2,000-mile fence to stop them — but the rabbits dug under it.",
+                animal: {
+                  name: "Cassowary",
+                  scientific: "Casuarius casuarius",
+                  bizarreFact: "Known as the world’s most dangerous bird, it can disembowel humans with a single kick. It has dinosaur-like claws and a helmet-like crest for ramming through brush."
+                }
+              },
+              {
+                history: "Lake Hillier in Western Australia is bubblegum pink. Scientists believe it’s due to microalgae that produce red pigments — but no one’s entirely sure. Oddly, it keeps its color even when removed from the lake.",
+                animal: {
+                  name: "Box Jellyfish",
+                  scientific: "Chironex fleckeri",
+                  bizarreFact: "This nearly invisible jellyfish has venom so potent it can stop a human heart in 3 minutes. Its 60 tentacles each contain enough toxin to kill 60 people."
+                }
+              },
+              {
+                history: "Wycliffe Well in the Northern Territory claims to be the 'UFO capital of Australia.' Locals report dozens of sightings every year. The roadhouse even sells alien-themed beer and encourages tourists to stay and wait for flying saucers.",
+                animal: {
+                  name: "Quokka",
+                  scientific: "Setonix brachyurus",
+                  bizarreFact: "Dubbed 'the happiest animal on Earth,' quokkas constantly look like they're smiling. But don’t mess with them — they’ll throw their babies at predators to escape."
+                }
+              },
+              {
+                history: "During WWII, Australian farmers repurposed beer bottles to make Molotov cocktails in case of Japanese invasion. They stored them in backyard sheds, along with cans of jam and sharpened farm tools. The plan: guerrilla jam-and-booze warfare.",
+                animal: {
+                  name: "Blue-Ringed Octopus",
+                  scientific: "Hapalochlaena lunulata",
+                  bizarreFact: "Only the size of a golf ball, it flashes neon blue rings when threatened and carries enough venom to kill 26 adults in minutes. There’s no antidote."
+                }
+              },
+              {
+                history: "In 2013, a group of Australians built a bar on a floating pile of plastic containers and driftwood. Located in international waters, it was called 'the world’s smallest micronation.' The government forced them to remove it after three months of rum and rebellion.",
+                animal: {
+                  name: "Tasmanian Devil",
+                  scientific: "Sarcophilus harrisii",
+                  bizarreFact: "They emit screams and growls so terrifying they scared early European settlers. When fighting over food, they’ll spin and bite each other like deranged cartoon characters."
+                }
+              },
+              {
+                history: "There's a town called Humpty Doo. It has a pub, a giant jumping croc, and a local tradition of naming chickens after ex-politicians. One such chicken was accidentally elected 'Mayor' after a ballot mix-up.",
+                animal: {
+                  name: "Wombat",
+                  scientific: "Vombatus ursinus",
+                  bizarreFact: "Wombats poop cubes. Yes, cubes. This prevents the droppings from rolling away and helps them mark territory. Scientists still aren’t fully sure how their intestines do it."
+                }
+              },
+              {
+                history: "Australia once built a spy base disguised as a kangaroo sanctuary. Located in Pine Gap, it’s so secretive that even most Australians don’t know what it does — except that it’s jointly operated with the CIA and likely monitors global satellite activity.",
+                animal: {
+                  name: "Flying Fox",
+                  scientific: "Pteropus scapulatus",
+                  bizarreFact: "A massive fruit bat with a 3-foot wingspan. Despite looking like a vampire, it’s a vegan that helps pollinate eucalyptus trees. At dusk, they fill the sky like living shadows."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Norway",
+            lat: 60.4720,
+            lng: 8.4689,
+            facts: [
+              {
+                history: "In 1932, Australia waged an actual war against emus. After soldiers armed with machine guns failed to curb the population of flightless birds destroying farmland, the emus won. The military retreated. Parliament never officially ended the 'Great Emu War' — making it one of history’s weirdest defeats.",
+                animal: {
+                  name: "Drop Bear",
+                  scientific: "Thylarctos plummetus",
+                  bizarreFact: "A fictional apex predator — Australians tell tourists these giant carnivorous koalas drop from trees onto unsuspecting hikers. Despite being fake, signs warning of them are posted in parks just to mess with visitors."
+                }
+              },
+              {
+                history: "In 1979, parts of the U.S. space station Skylab fell over Western Australia. The town of Esperance fined NASA $400 for littering — a bill NASA ignored until a radio show paid it 30 years later.",
+                animal: {
+                  name: "Platypus",
+                  scientific: "Ornithorhynchus anatinus",
+                  bizarreFact: "This egg-laying mammal has venomous ankle spurs, a bill that senses electricity, and no stomach. Early scientists thought it was a hoax stitched together from other animals."
+                }
+              },
+              {
+                history: "The town of Coober Pedy exists almost entirely underground. Residents live in 'dugouts' carved into old opal mines to escape 120°F (50°C) surface heat. Even churches and bars are buried below ground in this real-life desert Hobbiton.",
+                animal: {
+                  name: "Thorny Devil",
+                  scientific: "Moloch horridus",
+                  bizarreFact: "Covered in spikes and fake heads, it drinks through its skin — collecting morning dew through capillaries between its scales. It’s a living cactus-lizard hybrid."
+                }
+              },
+              {
+                history: "In 1859, a man named Thomas Austin released 24 rabbits for hunting on his farm. They multiplied into 600 million in under a century, devastating ecosystems. Australia built a 2,000-mile fence to stop them — but the rabbits dug under it.",
+                animal: {
+                  name: "Cassowary",
+                  scientific: "Casuarius casuarius",
+                  bizarreFact: "Known as the world’s most dangerous bird, it can disembowel humans with a single kick. It has dinosaur-like claws and a helmet-like crest for ramming through brush."
+                }
+              },
+              {
+                history: "Lake Hillier in Western Australia is bubblegum pink. Scientists believe it’s due to microalgae that produce red pigments — but no one’s entirely sure. Oddly, it keeps its color even when removed from the lake.",
+                animal: {
+                  name: "Box Jellyfish",
+                  scientific: "Chironex fleckeri",
+                  bizarreFact: "This nearly invisible jellyfish has venom so potent it can stop a human heart in 3 minutes. Its 60 tentacles each contain enough toxin to kill 60 people."
+                }
+              },
+              {
+                history: "Wycliffe Well in the Northern Territory claims to be the 'UFO capital of Australia.' Locals report dozens of sightings every year. The roadhouse even sells alien-themed beer and encourages tourists to stay and wait for flying saucers.",
+                animal: {
+                  name: "Quokka",
+                  scientific: "Setonix brachyurus",
+                  bizarreFact: "Dubbed 'the happiest animal on Earth,' quokkas constantly look like they're smiling. But don’t mess with them — they’ll throw their babies at predators to escape."
+                }
+              },
+              {
+                history: "During WWII, Australian farmers repurposed beer bottles to make Molotov cocktails in case of Japanese invasion. They stored them in backyard sheds, along with cans of jam and sharpened farm tools. The plan: guerrilla jam-and-booze warfare.",
+                animal: {
+                  name: "Blue-Ringed Octopus",
+                  scientific: "Hapalochlaena lunulata",
+                  bizarreFact: "Only the size of a golf ball, it flashes neon blue rings when threatened and carries enough venom to kill 26 adults in minutes. There’s no antidote."
+                }
+              },
+              {
+                history: "In 2013, a group of Australians built a bar on a floating pile of plastic containers and driftwood. Located in international waters, it was called 'the world’s smallest micronation.' The government forced them to remove it after three months of rum and rebellion.",
+                animal: {
+                  name: "Tasmanian Devil",
+                  scientific: "Sarcophilus harrisii",
+                  bizarreFact: "They emit screams and growls so terrifying they scared early European settlers. When fighting over food, they’ll spin and bite each other like deranged cartoon characters."
+                }
+              },
+              {
+                history: "There's a town called Humpty Doo. It has a pub, a giant jumping croc, and a local tradition of naming chickens after ex-politicians. One such chicken was accidentally elected 'Mayor' after a ballot mix-up.",
+                animal: {
+                  name: "Wombat",
+                  scientific: "Vombatus ursinus",
+                  bizarreFact: "Wombats poop cubes. Yes, cubes. This prevents the droppings from rolling away and helps them mark territory. Scientists still aren’t fully sure how their intestines do it."
+                }
+              },
+              {
+                history: "Australia once built a spy base disguised as a kangaroo sanctuary. Located in Pine Gap, it’s so secretive that even most Australians don’t know what it does — except that it’s jointly operated with the CIA and likely monitors global satellite activity.",
+                animal: {
+                  name: "Flying Fox",
+                  scientific: "Pteropus scapulatus",
+                  bizarreFact: "A massive fruit bat with a 3-foot wingspan. Despite looking like a vampire, it’s a vegan that helps pollinate eucalyptus trees. At dusk, they fill the sky like living shadows."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "India",
+            lat: 20.5937,
+            lng: 78.9629,
+            facts: [
+              {
+                history: "The Chola dynasty built the Brihadeeswarar Temple over 1,000 years ago using granite blocks weighing up to 80 tons — despite no nearby sources of granite. Legend says a 4-mile-long ramp was constructed to drag the stones up the tower. Its shadow famously never falls on the ground at noon, baffling architects even today.",
+                animal: {
+                  name: "Gharial",
+                  scientific: "Gavialis gangeticus",
+                  bizarreFact: "With its long, thin snout and over 100 sharp teeth, it looks like a cartoon villain. Males grow a bulbous bump on their nose called a 'ghara' that acts like a megaphone during mating calls."
+                }
+              },
+              {
+                history: "India holds the world record for the most people bathing at once: over 100 million pilgrims have gathered for the Kumbh Mela, a sacred Hindu festival. The event is so massive it’s visible from space — creating the largest human gathering ever recorded on Earth.",
+                animal: {
+                  name: "Indian Cobra",
+                  scientific: "Naja naja",
+                  bizarreFact: "Can 'stand' over 3 feet tall when threatened and flares its hood with a fake set of eyes. Despite deadly venom, it’s worshipped during Nag Panchami — and has been featured in snake-charming rituals for centuries."
+                }
+              },
+              {
+                history: "Shani Shingnapur is an Indian village where no one locks their doors — because the residents believe the god Shani will strike down any thief. Banks and homes alike go unlocked, and the village claims to have had zero reported thefts in over 300 years.",
+                animal: {
+                  name: "Purple Frog",
+                  scientific: "Nasikabatrachus sahyadrensis",
+                  bizarreFact: "Looks like a bloated grape with a snout. It spends 99% of its life underground and only emerges during monsoon rains for a few hours to mate."
+                }
+              },
+              {
+                history: "The Iron Pillar of Delhi has stood for over 1,600 years without rusting — despite monsoons, pollution, and humidity. Scientists believe ancient Indian blacksmiths used a special phosphorus-based technique lost to time. Modern metallurgists still study it.",
+                animal: {
+                  name: "Indian Bullfrog",
+                  scientific: "Hoplobatrachus tigerinus",
+                  bizarreFact: "Turns neon yellow during mating season and grows bright blue vocal sacs. It croaks loudly and leaps at females with such force they sometimes faint."
+                }
+              },
+              {
+                history: "India’s 'Lonar Crater' was formed by a meteor strike 52,000 years ago — but locals thought it was a divine lake. In 2020, the lake turned bright pink overnight. Scientists later discovered the color came from halophilic bacteria blooming due to changing salinity.",
+                animal: {
+                  name: "Indian Pangolin",
+                  scientific: "Manis crassicaudata",
+                  bizarreFact: "Covered in keratin scales, it can curl into an armored ball. When threatened, it releases a noxious-smelling spray from glands — basically a skunky tank with claws."
+                }
+              },
+              {
+                history: "In the city of Varanasi, cremations have taken place non-stop for over 3,000 years. Even during floods or pandemics, the fire at Manikarnika Ghat has never been extinguished. Locals believe dying there ensures liberation from the cycle of reincarnation.",
+                animal: {
+                  name: "Sarus Crane",
+                  scientific: "Grus antigone",
+                  bizarreFact: "The world’s tallest flying bird — up to 6 feet tall — and mates for life. If one dies, the other sometimes fasts to death in mourning."
+                }
+              },
+              {
+                history: "India once trained a corps of female warriors called the 'Jhansi Regiment' during World War II, led by Subhas Chandra Bose. They wore khaki uniforms, carried rifles, and pledged to fight colonial rule. Many were teenagers — willing to die for independence.",
+                animal: {
+                  name: "Sloth Bear",
+                  scientific: "Melursus ursinus",
+                  bizarreFact: "Has a vacuum-like mouth that sucks termites from nests, making loud snorting noises. It’s the real-life inspiration for Baloo from The Jungle Book — but far more aggressive in person."
+                }
+              },
+              {
+                history: "The ancient Indian epic, the Mahabharata, is over 1.8 million words long — more than 10 times the length of the Iliad and Odyssey combined. Some scholars believe it was passed down orally for centuries before being written down.",
+                animal: {
+                  name: "Lion-tailed Macaque",
+                  scientific: "Macaca silenus",
+                  bizarreFact: "Has a silver mane like a tiny wizard and avoids humans completely. It’s one of the rarest primates on Earth — often fleeing if it even hears human voices nearby."
+                }
+              },
+              {
+                history: "In Chandipur, Odisha, the sea vanishes every day — retreating over 5 kilometers and returning hours later. Locals walk out onto the ocean floor to gather shellfish before the tide rushes back like a mini tsunami.",
+                animal: {
+                  name: "Indian Star Tortoise",
+                  scientific: "Geochelone elegans",
+                  bizarreFact: "Has a beautiful starburst pattern on its shell that confuses predators. When flipped upside down, its shell shape helps it roll back onto its feet like a self-righting bowl."
+                }
+              },
+              {
+                history: "Taj Mahal was nearly dismantled and auctioned off by the British in the 1830s. They saw no value in the monument — only the white marble. Fortunately, the plan was abandoned due to low bids and transport costs. The Taj survived purely by economic accident.",
+                animal: {
+                  name: "Indian Flying Fox",
+                  scientific: "Pteropus medius",
+                  bizarreFact: "A massive fruit bat with a 4-foot wingspan. It hangs upside down in trees by the thousands and screams all night. In some temples, they’re fed bananas as sacred creatures."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Canada",
+            lat: 56.1304,
+            lng: -106.3468,
+            facts: [
+              {
+                history: "In the War of 1812, Canadian and British troops invaded Washington, D.C. and burned down the White House. The act was retaliation for American troops torching parts of Ontario. Rain saved much of the city from complete destruction. Later, British officers drank wine in the President’s dining room before setting it ablaze.",
+                animal: {
+                  name: "Narwhal",
+                  scientific: "Monodon monoceros",
+                  bizarreFact: "Known as the 'unicorn of the sea,' the narwhal’s spiral tusk is actually a giant, super-sensitive front tooth. It can detect water temperature, pressure, and even salinity — and can grow up to 10 feet long."
+                }
+              },
+              {
+                history: "In 1959, Canada canceled its Avro Arrow jet program overnight and destroyed all prototypes, blueprints, and models. Conspiracy theories claim U.S. pressure killed the project. Some say engineers fled to NASA and helped get America to the moon.",
+                animal: {
+                  name: "Beaver",
+                  scientific: "Castor canadensis",
+                  bizarreFact: "Canada’s national animal builds giant underwater lodges using logs and mud. Their teeth are orange due to iron content and self-sharpen through constant gnawing — they're natural engineers."
+                }
+              },
+              {
+                history: "There’s a town in British Columbia called Dildo. It’s not alone — Newfoundland has towns named Come By Chance, Blow Me Down, and Cow Head. These names often originate from early explorers or jokes that simply stuck. Locals wear the names proudly.",
+                animal: {
+                  name: "Hoary Marmot",
+                  scientific: "Marmota caligata",
+                  bizarreFact: "Called the 'whistler' for its high-pitched warning calls, this mountain rodent spends 8 months a year hibernating under snow. It literally eats so much in summer it becomes a fat, sleepy sausage."
+                }
+              },
+              {
+                history: "Churchill, Manitoba is known as the 'Polar Bear Capital of the World.' Residents leave their cars unlocked so pedestrians can escape if a bear approaches. Some bears even walk down main street. The town also has bear jails to detain troublemakers.",
+                animal: {
+                  name: "Polar Bear",
+                  scientific: "Ursus maritimus",
+                  bizarreFact: "Their fur is transparent, not white, and their skin is black. Polar bears can smell a seal from over 20 miles away — and sometimes cover their black noses with their paws while stalking prey."
+                }
+              },
+              {
+                history: "In 2017, Canada released a glow-in-the-dark coin to celebrate the country's 150th birthday. It shows the northern lights when viewed under UV light. It was the world’s first legal tender coin that glows — and people spent them on vending machines.",
+                animal: {
+                  name: "Northern Lights Moth",
+                  scientific: "Autographa precationis",
+                  bizarreFact: "This moth glows faintly under ultraviolet light and is one of many species drawn magnetically to aurora-lit skies. It’s nicknamed the 'night painter' in indigenous folklore."
+                }
+              },
+              {
+                history: "In Quebec, it’s illegal to challenge someone to a duel. This law has existed since 1839, after a lawyer fatally stabbed a politician over an insult. The Canadian criminal code still forbids dueling — just in case things get too old-school.",
+                animal: {
+                  name: "Canada Goose",
+                  scientific: "Branta canadensis",
+                  bizarreFact: "Feared more than admired, these aggressively territorial birds will chase cars, people, and even police horses. Their poop can carpet entire parks — and they mate for life, honking all the way."
+                }
+              },
+              {
+                history: "In Alberta, it’s legal to own a pet bison. Some Canadians keep them as lawn ornaments or companions. A man once drove his bison through a Tim Hortons drive-thru. Photos show the animal patiently waiting at the window.",
+                animal: {
+                  name: "Wood Bison",
+                  scientific: "Bison bison athabascae",
+                  bizarreFact: "The largest land mammal in North America. Males can weigh over 2,000 pounds but can jump nearly 6 feet straight up — making fences optional."
+                }
+              },
+              {
+                history: "In Nova Scotia, a man tried to pay a speeding ticket with pennies — over 10,000 of them, delivered in buckets. It took the court clerk hours to count. In the end, the fine was accepted — but only after staff brought in help from a local coin museum.",
+                animal: {
+                  name: "Common Loon",
+                  scientific: "Gavia immer",
+                  bizarreFact: "Their eerie calls can carry for miles across lakes. Loons have solid bones and sink like stones to dive for fish. Their red eyes help them see underwater — they’re literally built for stealth."
+                }
+              },
+              {
+                history: "Canadians invented the world’s first paintball gun — not for sport, but to mark trees. The original version used gelatin capsules of dye and CO2 cartridges. When people began shooting each other with them for fun, a new sport was born.",
+                animal: {
+                  name: "Snow Flea",
+                  scientific: "Hypogastrura nivicola",
+                  bizarreFact: "These tiny springtails bounce on snow like living pepper flakes. They produce a natural antifreeze that keeps them active in below-zero temperatures — nature’s weirdest winter survivalists."
+                }
+              },
+              {
+                history: "The CN Tower in Toronto was once the tallest free-standing structure in the world. Construction workers played hockey at the top during breaks. At 1,800 feet high, it still hosts an annual stair-climb race — for charity and bragging rights.",
+                animal: {
+                  name: "Atlantic Puffin",
+                  scientific: "Fratercula arctica",
+                  bizarreFact: "Their bright beaks fade in winter and glow under UV light. Puffins mate for life and carry up to 10 fish at once — stacked sideways in their beaks like lunch trays."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "South Africa",
+            lat: -30.5595,
+            lng: 22.9375,
+            facts: [
+              {
+                history: "In the 1850s, a teenage girl named Nongqawuse told her tribe that if they destroyed their crops and cattle, the spirits would rise and drive out British colonizers. Tens of thousands obeyed — and starved. It was one of history’s most tragic acts of prophetic influence, changing the course of Xhosa resistance forever.",
+                animal: {
+                  name: "Aardvark",
+                  scientific: "Orycteropus afer",
+                  bizarreFact: "Despite looking like an anteater, it’s in its own weird order entirely. It has teeth without enamel and a pig-like snout it uses to sniff out termites by the thousands each night."
+                }
+              },
+              {
+                history: "South Africa has three capital cities, 11 official languages, and one of the most complex national flags in the world. It’s the only country to voluntarily give up its nuclear weapons — dismantling them entirely after apartheid ended.",
+                animal: {
+                  name: "Cape Rain Frog",
+                  scientific: "Breviceps gibbosus",
+                  bizarreFact: "Looks like a tiny, angry balloon and can’t hop — it waddles. When threatened, it inflates itself and squeaks like a dog toy to scare predators."
+                }
+              },
+              {
+                history: "Robben Island, where Nelson Mandela was imprisoned for 18 years, was once a leper colony and an insane asylum. The island has served as a prison for over 400 years — including under Dutch and British rule.",
+                animal: {
+                  name: "African Penguin",
+                  scientific: "Spheniscus demersus",
+                  bizarreFact: "Also known as 'jackass penguins' because of their donkey-like braying. They have pink glands above their eyes that help them regulate temperature in the scorching sun."
+                }
+              },
+              {
+                history: "In 2005, the South African government declared Table Mountain one of the 'New 7 Wonders of Nature.' Ancient indigenous groups believed it was a gateway to the spirit world — a place where clouds formed from ancestral fires.",
+                animal: {
+                  name: "Baboon Spider",
+                  scientific: "Harpactira cafreriana",
+                  bizarreFact: "This tarantula is named after baboons not because of size — but for its thick, hairy legs. Despite being scary-looking, its venom is mild and its silk surprisingly strong."
+                }
+              },
+              {
+                history: "In the 1960s, South Africa built an entire city underground in the Witwatersrand Basin just to mine gold. Some tunnels go 4 kilometers deep — the deepest manmade holes on Earth — where temperatures can reach 140°F unless cooled by ice water.",
+                animal: {
+                  name: "Golden Mole",
+                  scientific: "Chrysochloris asiatica",
+                  bizarreFact: "Completely blind, covered in iridescent fur, and swims through sand like a fish. Its skull is built like a battering ram to bulldoze underground tunnels."
+                }
+              },
+              {
+                history: "South Africa’s 'Cradle of Humankind' has produced some of the oldest human fossils ever found — including a nearly complete skeleton over 2 million years old. The caves are UNESCO-protected and have yielded thousands of ancient hominin bones.",
+                animal: {
+                  name: "Rock Hyrax",
+                  scientific: "Procavia capensis",
+                  bizarreFact: "Looks like a rabbit-sized rodent but is more closely related to elephants. Their feet secrete sweat-like goo to improve grip on rocky cliffs."
+                }
+              },
+              {
+                history: "In 2010, South Africa hosted the FIFA World Cup — the first African nation to do so. The tournament was famous for the constant drone of vuvuzelas, plastic horns so loud they registered on seismographs and caused global headaches.",
+                animal: {
+                  name: "Secretary Bird",
+                  scientific: "Sagittarius serpentarius",
+                  bizarreFact: "Looks like a hawk with long legs and eyeliner. It hunts snakes by stomping them to death — delivering over 5 kicks per second with sharp talons."
+                }
+              },
+              {
+                history: "District Six in Cape Town was once a vibrant multiethnic neighborhood. During apartheid, 60,000 residents were forcibly removed and their homes bulldozed. Today, its ruins are preserved as a museum and symbol of resilience.",
+                animal: {
+                  name: "Pangolin",
+                  scientific: "Smutsia temminckii",
+                  bizarreFact: "Covered in armored keratin scales, it curls into a ball when threatened. It has no teeth but eats ants with a 2-foot-long sticky tongue. It’s the most trafficked mammal in the world."
+                }
+              },
+              {
+                history: "In 2017, a baboon gang in Cape Town repeatedly raided homes and stole fruit, soda, and even money. The alpha male was nicknamed 'Spiderman' for his roof-scaling abilities. Park rangers tracked him using GPS before relocating him miles away.",
+                animal: {
+                  name: "Chacma Baboon",
+                  scientific: "Papio ursinus",
+                  bizarreFact: "Form massive troops and communicate with over 30 distinct sounds. Some troops live entirely in cities, learning to open car doors, unzip tents, and steal food from tourists."
+                }
+              },
+              {
+                history: "The Karoo Desert hosts a remote radio telescope array that’s part of the Square Kilometre Array — one of the most ambitious scientific projects on Earth. It will map the early universe, detect alien signals, and even test Einstein’s theories.",
+                animal: {
+                  name: "Bat-Eared Fox",
+                  scientific: "Otocyon megalotis",
+                  bizarreFact: "Has ears larger than its head — used to locate underground insects. It eats mostly termites and listens for them by pressing its face to the dirt like a radar dish."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Argentina",
+            lat: -38.4161,
+            lng: -63.6167,
+            facts: [
+              {
+                history: "In 1987, Argentinians jokingly elected a cartoon character — Clemente — to protest corruption. Posters declared 'Vote for Clemente, he already has no arms to steal with!' The campaign, entirely satirical, gained enough traction that Clemente appeared in national debates. Though fictional, he captured the public's imagination and symbolized how absurd real politics had become.",
+                animal: {
+                  name: "Patagonian Mara",
+                  scientific: "Dolichotis patagonum",
+                  bizarreFact: "Looks like a rabbit on stilts but is actually a giant rodent. It can sprint at 35 mph and mates for life, even suffering 'jealous fits' if separated."
+                }
+              },
+              {
+                history: "Argentina is home to a lake with a mysterious magnetic anomaly: Laguna del Carbón, one of the lowest points in the Americas. Local legends claim compasses spin wildly and electronics fail. While science blames mineral content, UFO enthusiasts insist it’s a portal or alien base.",
+                animal: {
+                  name: "Andean Condor",
+                  scientific: "Vultur gryphus",
+                  bizarreFact: "One of the largest flying birds on Earth, with a wingspan over 10 feet. It can soar for hours without flapping — riding thermals over the Andes like a giant vulture-glider."
+                }
+              },
+              {
+                history: "In the 1970s, Argentina hosted an international 'duck pulling' tournament. Horsemen galloped at full speed to rip a dead duck from each other’s hands — a brutal sport with colonial origins. Today, it's been sanitized into 'pato,' the official national sport, and uses a ball with handles.",
+                animal: {
+                  name: "Capybara",
+                  scientific: "Hydrochoerus hydrochaeris",
+                  bizarreFact: "Frequently seen lounging in Argentine suburbs. These chill rodents swim, sunbathe, and hang with dogs and ducks. They're social icons — and legally protected in many areas."
+                }
+              },
+              {
+                history: "In 1913, Buenos Aires became the first city in the Southern Hemisphere to have a subway system. Even more bizarre? Some early trains were made of wood and ran for nearly a century. Locals say the wooden cars still 'creaked with ghost stories.'",
+                animal: {
+                  name: "Tegu Lizard",
+                  scientific: "Salvator merianae",
+                  bizarreFact: "A massive black-and-white lizard that can grow over 4 feet long and becomes warm-blooded during mating season. They’re surprisingly docile — some people keep them as pets with names like 'Tank' and 'Gizmo.'"
+                }
+              },
+              {
+                history: "In Patagonia, entire villages have been swallowed by shifting sand dunes — buried like modern Pompeii. Locals call them 'ghost towns of the desert wind.' Every few decades, a steeple or roof re-emerges before disappearing again.",
+                animal: {
+                  name: "Humboldt Penguin",
+                  scientific: "Spheniscus humboldti",
+                  bizarreFact: "Nests along Argentina’s coast in burrows like rabbits. They honk like donkeys and hold beak-to-beak courtship rituals. Some mate for 20+ years and mourn partners like humans."
+                }
+              },
+              {
+                history: "Argentina was once considered for a spaceport launch site. In 1961, they launched a mouse named 'Belisario' into near space in a balloon. He returned safely and received a hero’s welcome — and a full military parade.",
+                animal: {
+                  name: "Vizcacha",
+                  scientific: "Lagidium viscacia",
+                  bizarreFact: "Looks like a rabbit-chinchilla hybrid with a permanent sleepy smile. They sunbathe on rocks in groups and have incredible vertical leaping skills — up to 10 feet high."
+                }
+              },
+              {
+                history: "Eva Perón, the First Lady of Argentina, was embalmed so perfectly that her body remained lifelike for decades. After political turmoil, it was hidden in Italy under a fake name for 16 years before being returned. Her corpse even survived a gunshot.",
+                animal: {
+                  name: "Pejerrey Fish",
+                  scientific: "Odontesthes bonariensis",
+                  bizarreFact: "This translucent freshwater fish changes sex depending on water temperature — sometimes producing only females. It's Argentina’s most fished species — and one of its weirdest."
+                }
+              },
+              {
+                history: "Argentina’s wine industry was built by Jesuit monks in the 1600s. But in 2010, scientists found that native yeasts in the Andes valleys had genetically adapted to high-altitude fermentation. The wine ferments faster and stronger — creating a natural alcoholic mutation.",
+                animal: {
+                  name: "Darwin’s Frog (Patagonian)",
+                  scientific: "Rhinoderma darwinii",
+                  bizarreFact: "Males swallow fertilized eggs and carry them in their vocal sacs until fully formed froglets hop out of their mouths — possibly the strangest frog parenting in nature."
+                }
+              },
+              {
+                history: "Buenos Aires once had a zoo where animals roamed outside cages. In the 1980s, a bear escaped and was found bathing in a fountain surrounded by schoolchildren. Rather than panic, zookeepers lured him back with a sandwich.",
+                animal: {
+                  name: "South American Coati",
+                  scientific: "Nasua nasua",
+                  bizarreFact: "Looks like a raccoon with a pointy nose and lives in female-only bands of 30. They’re skilled thieves — even learning to unzip tents and steal chips at campsites."
+                }
+              },
+              {
+                history: "In 2012, an Argentine farmer discovered an enormous fossil — a giant armadillo shell. Turns out it was a glyptodon: an Ice Age creature the size of a Volkswagen Beetle. He thought it was an alien egg.",
+                animal: {
+                  name: "Giant Armadillo",
+                  scientific: "Priodontes maximus",
+                  bizarreFact: "Can dig tunnels over 20 feet long. Despite its armor, it’s incredibly shy and rarely seen. It has up to 100 teeth — more than any other mammal."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Indonesia",
+            lat: -0.7893,
+            lng: 113.9213,
+            facts: [
+              {
+                history: "Ancient Indonesian tribes once used shrunken human heads — known as tsantsas — as trophies, charms, or even spiritual currency. In some remote regions, warriors believed capturing an enemy’s head would trap their soul. While not widespread today, museum collections still hold real examples of these preserved heads, complete with stitched mouths and wide glassy eyes.",
+                animal: {
+                  name: "Komodo Dragon",
+                  scientific: "Varanus komodoensis",
+                  bizarreFact: "Can smell blood from 6 miles away and deliver venom that stops clotting. One bite can kill a water buffalo, and they’ll patiently follow wounded prey for days until it collapses."
+                }
+              },
+              {
+                history: "In 1815, Mount Tambora erupted in one of the largest volcanic events in recorded history. It was so massive it blocked sunlight, caused global temperature drops, and created 'The Year Without a Summer.' Indonesia's skies turned red for months — and crops failed as far away as Europe.",
+                animal: {
+                  name: "Flying Snake",
+                  scientific: "Chrysopelea paradisi",
+                  bizarreFact: "Native to Indonesia’s forests, this snake launches itself from trees and glides through the air by flattening its body like a ribbon. It can steer mid-flight using serpentine movements."
+                }
+              },
+              {
+                history: "Indonesia’s Torajan people hold elaborate death rituals — including exhuming their mummified ancestors every few years to bathe, redress, and 'reunite' them with the living. It’s part of a belief system that death is not an end but a long journey home.",
+                animal: {
+                  name: "Sulawesi Bear Cuscus",
+                  scientific: "Ailurops ursinus",
+                  bizarreFact: "A slow-moving tree-dweller with thick fur and a prehensile tail, it looks like a mix between a sloth and a cat. It’s so rare it was once thought to be mythical."
+                }
+              },
+              {
+                history: "Bali was once ruled by a king who claimed to have magic powers and declared war on Dutch colonizers by marching his court into battle in full ceremonial dress. They were slaughtered in a mass ritual suicide known as a 'puputan' — a final act of defiance over surrender.",
+                animal: {
+                  name: "Maleo",
+                  scientific: "Macrocephalon maleo",
+                  bizarreFact: "This endangered bird buries its eggs in hot volcanic sand — letting geothermal heat incubate them. Hatchlings dig their way out and fly off on their own immediately after hatching."
+                }
+              },
+              {
+                history: "Indonesia has over 700 languages — the second-most linguistically diverse country after Papua New Guinea. Some islands have dialects so different that neighboring villages can’t understand each other. In some places, locals speak three or more languages daily, switching depending on family, trade, or ritual.",
+                animal: {
+                  name: "Banggai Cardinalfish",
+                  scientific: "Pterapogon kauderni",
+                  bizarreFact: "Found only in Indonesian waters, this fish forms lifelong pairs and parents carry their babies in their mouths. When frightened, the babies rush back into the father's mouth like a living shelter."
+                }
+              },
+              {
+                history: "In 2003, archaeologists discovered the 'Hobbit People' — Homo floresiensis — on the island of Flores. These 3-foot-tall ancient humans lived 50,000 years ago and hunted pygmy elephants. Their discovery rewrote everything scientists thought they knew about human evolution.",
+                animal: {
+                  name: "Celebes Crested Macaque",
+                  scientific: "Macaca nigra",
+                  bizarreFact: "With black fur and vampire-like fangs, this monkey is famous for taking a selfie with a photographer’s camera — sparking a global copyright lawsuit. It became the first monkey to spark a legal case."
+                }
+              },
+              {
+                history: "Jakarta, Indonesia’s capital, is sinking faster than any other major city on Earth — up to 10 inches per year. Experts predict one-third of the city could be underwater by 2050. The government is now planning to move the capital to Borneo.",
+                animal: {
+                  name: "Tarsier",
+                  scientific: "Tarsius tarsier",
+                  bizarreFact: "This tiny primate has eyeballs bigger than its brain. It can rotate its head 180 degrees like an owl and leap 40 times its own body length — straight into the air."
+                }
+              },
+              {
+                history: "Indonesia’s Krakatoa eruption in 1883 caused explosions so loud they were heard 3,000 miles away — the farthest sound ever recorded. It destroyed over 165 villages, generated a 120-foot tsunami, and darkened the sky for months. The pressure wave circled the globe seven times.",
+                animal: {
+                  name: "Coconut Crab",
+                  scientific: "Birgus latro",
+                  bizarreFact: "The largest land-living arthropod in the world, it can grow up to 3 feet across and crack coconuts with its claws. Locals say they’ve stolen pots, shoes — even trash cans."
+                }
+              },
+              {
+                history: "In Java, there are sacred volcanoes where locals hike barefoot carrying offerings of rice, chickens, or even goats into craters to appease the spirits. These rituals date back thousands of years and blend Hindu, Buddhist, and animist beliefs.",
+                animal: {
+                  name: "Javan Rhino",
+                  scientific: "Rhinoceros sondaicus",
+                  bizarreFact: "With only around 80 individuals left, it’s one of the rarest mammals on Earth. Unlike African rhinos, it has only one horn and hides deep in thick jungle — so secretive, it was once thought extinct."
+                }
+              },
+              {
+                history: "Indonesia’s forests are so thick and mysterious that stories persist of the 'Orang Pendek' — a small humanoid ape said to walk upright. Even some scientists believe it might be a surviving hominid species. Expeditions continue to search for it in the jungles of Sumatra.",
+                animal: {
+                  name: "Slow Loris",
+                  scientific: "Nycticebus javanicus",
+                  bizarreFact: "Looks like a cuddly plush toy but has a toxic bite — one of the few venomous mammals. It licks poison from glands near its elbows and delivers it via razor-sharp teeth."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Germany",
+            lat: 51.1657,
+            lng: 10.4515,
+            facts: [
+              {
+                history: "In the 1800s, Germany taxed dog tails to encourage a 'neat' appearance. This led to mass tail-docking among pet owners to avoid paying fees. It was part of a broader obsession with dog breeding — and many now-standard breeds (like the Doberman) were created in Germany during this time. Even today, tail docking remains controversial and mostly banned.",
+                animal: {
+                  name: "Axolotl",
+                  scientific: "Ambystoma mexicanum",
+                  bizarreFact: "Although native to Mexico, Germany is one of the largest breeders of axolotls in the world. These salamanders stay in their larval form for life and can regrow lost limbs, tails, spinal cords, and even brain parts."
+                }
+              },
+              {
+                history: "Germany built an airport just for Nazi UFO research during WWII. The ‘Reichsflugscheibe’ project allegedly tested flying saucer designs — fueled by secret technology. Though mostly dismissed as myth, the theory persists in fringe communities, and blueprints found decades later only added fuel to the story.",
+                animal: {
+                  name: "European Mole",
+                  scientific: "Talpa europaea",
+                  bizarreFact: "Can tunnel through earth at 15 feet per hour. Its paws rotate like screwdrivers, and it stores worms in underground larders — paralyzing them but keeping them alive for months."
+                }
+              },
+              {
+                history: "In 1920s Berlin, a chimpanzee named 'Susi' was adopted by a nightclub. She wore dresses, smoked cigars, and served drinks to patrons. When she died, the city held a public funeral. Newspapers covered it like royalty had passed.",
+                animal: {
+                  name: "Fire Salamander",
+                  scientific: "Salamandra salamandra",
+                  bizarreFact: "Excretes neurotoxins from behind its eyes and glows under UV light. Its black-and-yellow pattern warns predators: 'eat me and die.' Some medieval Germans believed it was born from fire itself."
+                }
+              },
+              {
+                history: "Germany’s oldest city, Trier, was allegedly founded by descendants of ancient Trojans — predating Rome. This myth was promoted by emperors to give Germany deeper roots. Trier’s Porta Nigra, a Roman gate still standing, reinforces the story, even though historians now debunk the Trojan link.",
+                animal: {
+                  name: "European Eel",
+                  scientific: "Anguilla anguilla",
+                  bizarreFact: "Born in the Sargasso Sea, they migrate thousands of miles to German rivers. No one has ever witnessed their mating. For centuries, scientists thought they just spontaneously generated from mud."
+                }
+              },
+              {
+                history: "In 1963, German engineers built a beer pipeline under Dortmund to reduce beer transport times. Bars were directly connected to breweries by hose. It’s still operational and dispenses over 4,000 liters of beer an hour — no trucks, no taps, just pressurized beer flow.",
+                animal: {
+                  name: "European Hedgehog",
+                  scientific: "Erinaceus europaeus",
+                  bizarreFact: "When nervous, it foams at the mouth and rubs the saliva on its quills — possibly to deter predators or attract mates. Scientists still don’t fully understand this self-anointing ritual."
+                }
+              },
+              {
+                history: "The narrowest street in the world is in Reutlingen, Germany — Spreuerhofstraße — measuring just 31 cm (12.2 inches) wide. Tourists flock to squeeze through it, but locals mostly roll their eyes. It was built after a massive fire in 1726 as a fire alley.",
+                animal: {
+                  name: "Raccoon Dog",
+                  scientific: "Nyctereutes procyonoides",
+                  bizarreFact: "Despite its name, it’s not a raccoon or a dog. This masked critter emits a pungent musk and fakes death when frightened. Introduced by humans, it’s now stealthily spreading across Germany’s forests."
+                }
+              },
+              {
+                history: "In the 1500s, a German man named Peter Stumpp was executed for being a werewolf. He confessed under torture to eating his own son and making deals with the devil. His trial remains one of the most detailed records of werewolf hysteria in European history.",
+                animal: {
+                  name: "Bearded Vulture",
+                  scientific: "Gypaetus barbatus",
+                  bizarreFact: "Eats mostly bone. It drops carcasses from high altitudes to shatter them, then swallows the fragments. Its stomach acid is so powerful it can dissolve bone in under 24 hours."
+                }
+              },
+              {
+                history: "Germany once had a 'ghost train' that crossed from West Berlin to East Berlin without stopping. Passengers would see locked doors, bricked-up stations, and armed guards as they passed through Cold War territory. It was part of a secret agreement to maintain rail lines.",
+                animal: {
+                  name: "Blind Cave Beetle",
+                  scientific: "Leptodirus hochenwartii",
+                  bizarreFact: "Native to Germany’s karst caves, this beetle has no eyes, no wings, and absorbs water through its legs. It can survive years without food by lowering its metabolism nearly to zero."
+                }
+              },
+              {
+                history: "Würzburg’s medieval bridge is lined with statues — including one of a bishop holding a severed head. According to legend, the bishop was decapitated but continued to walk several steps before collapsing. The statue celebrates this gory miracle.",
+                animal: {
+                  name: "Great Crested Newt",
+                  scientific: "Triturus cristatus",
+                  bizarreFact: "Grows a jagged, dinosaur-like crest during mating season and waves its tail like a flag to attract mates. It’s protected by law — you need government permission just to touch one."
+                }
+              },
+              {
+                history: "In 2014, a forest ranger in Bavaria discovered a colony of singing mice that harmonized like choirs. Biologists confirmed it — the mice had regional 'songs' and formed synchronized duets. They’re now studied for insight into the evolution of vocal learning.",
+                animal: {
+                  name: "European Bat",
+                  scientific: "Myotis myotis",
+                  bizarreFact: "Echolocation master that can hear the rustle of insect wings from 30 feet away. Germany houses thousands in church towers — some even have ‘bat balconies’ installed to encourage their return."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "United Kingdom",
+            lat: 55.3781,
+            lng: -3.4360,
+            facts: [
+              {
+                history: "In the 1600s, the British government accepted bizarre forms of tax payment — including dog fur, beeswax, and even leeches. During the English Civil War, some taxes were paid in cannonballs or barrels of ale. One village reportedly paid in eels — measured in 'sticks' of 25. The sheer oddity of it all shows how creative early Brits could be when dodging coin.",
+                animal: {
+                  name: "Scottish Wildcat",
+                  scientific: "Felis silvestris grampia",
+                  bizarreFact: "Looks nearly identical to a tabby cat, but it's completely untamable. With thicker bones and stronger jaws, it's dubbed the 'Tiger of the Highlands' and is one of the rarest mammals in Europe."
+                }
+              },
+              {
+                history: "Big Ben isn’t the clock or the tower — it’s the bell inside. The tower is officially named the Elizabeth Tower, renamed in 2012 for Queen Elizabeth II. In 1859, when the bell first rang, it cracked. Instead of replacing it, engineers rotated the bell and used a lighter hammer. That cracked bell is still chiming today.",
+                animal: {
+                  name: "European Eel",
+                  scientific: "Anguilla anguilla",
+                  bizarreFact: "Spends most of its life in British rivers but swims thousands of miles to the Sargasso Sea to breed — and dies after. No one has ever seen it mate in the wild."
+                }
+              },
+              {
+                history: "There’s an actual law in London stating it's illegal to die in the Houses of Parliament — because dying there technically entitles you to a state funeral. While the law isn’t enforced, it’s frequently cited in lists of Britain’s strangest legislation. It speaks to how deeply ceremonial the British political system remains.",
+                animal: {
+                  name: "Haggis (mythical)",
+                  scientific: "Fictitius scoticus",
+                  bizarreFact: "Jokingly described as a real animal in Scottish folklore with legs shorter on one side to run around mountains. Tourists are regularly pranked into believing it’s a living creature."
+                }
+              },
+              {
+                history: "Queen Elizabeth I owned over 3,000 dresses at the time of her death. She bathed once a month — which was considered luxurious. Her teeth turned black from too much sugar, a fashionable indulgence in 16th-century England. In fact, people blackened their own teeth to appear rich.",
+                animal: {
+                  name: "Red Deer",
+                  scientific: "Cervus elaphus",
+                  bizarreFact: "The UK's largest land mammal can weigh over 500 pounds. During rutting season, males roar so loudly it echoes through valleys — their version of love poetry and intimidation."
+                }
+              },
+              {
+                history: "In 1702, the town of Painswick held a world championship for 'wool sack racing,' where competitors sprint uphill carrying 60-pound sacks. The event still happens annually. Locals call it 'the most British sport you’ve never heard of.' It’s as painful as it sounds.",
+                animal: {
+                  name: "Slow Worm",
+                  scientific: "Anguis fragilis",
+                  bizarreFact: "A legless lizard often mistaken for a snake. It can blink (unlike snakes), drop its tail to escape, and lives up to 50 years in the wild — basically, a stealthy garden ninja."
+                }
+              },
+              {
+                history: "London’s Tower Ravens are legally required to remain on-site. Legend says that if the ravens leave, the crown and Britain will fall. To prevent this, one of their wings is clipped. They live in the Tower of London with an official Ravenmaster and even receive meat rations and medical checkups.",
+                animal: {
+                  name: "Common Raven",
+                  scientific: "Corvus corax",
+                  bizarreFact: "Ravens can mimic human speech and solve logic puzzles. Tower ravens have been known to swipe coins, mimic guards’ voices, and play tricks on tourists."
+                }
+              },
+              {
+                history: "In 1953, Winston Churchill was hit by a taxi in New York — and then blamed it on American driving. When he returned home, the British government secretly passed a motion to name a street corner in Manhattan after him. It’s still there, with a plaque.",
+                animal: {
+                  name: "Pipistrelle Bat",
+                  scientific: "Pipistrellus pipistrellus",
+                  bizarreFact: "Britain’s smallest bat can eat over 3,000 insects in a night. It’s so small it can roost inside a keyhole. Entire colonies fit inside church walls or roof tiles."
+                }
+              },
+              {
+                history: "A medieval law in Chester once allowed any Welshman found inside the city walls after sunset to be legally executed with a longbow. Though never enforced in modern times, the law technically remained on the books until the late 20th century.",
+                animal: {
+                  name: "European Badger",
+                  scientific: "Meles meles",
+                  bizarreFact: "Lives in complex underground tunnels called 'setts' that can last for centuries. British badgers are fiercely territorial and sleep in communal nests with straw-lined chambers."
+                }
+              },
+              {
+                history: "In the 1800s, Britain tried to solve the 'urban pigeon problem' by importing hawks to chase them off — but the hawks just flew away and joined the pigeons in eating breadcrumbs. The plan was a total failure and led to even more birds loitering in parks.",
+                animal: {
+                  name: "Mute Swan",
+                  scientific: "Cygnus olor",
+                  bizarreFact: "Technically all unmarked swans on open waters belong to the monarch. They’re aggressive and can break bones with a wing strike — earning a royal reputation for violence."
+                }
+              },
+              {
+                history: "In 2022, a parrot named Nigel returned to his UK owner after going missing for four years — but now only spoke Spanish. He had apparently been adopted by a Spanish-speaking family and returned with a new vocabulary, attitude, and accent.",
+                animal: {
+                  name: "Grey Parrot",
+                  scientific: "Psittacus erithacus",
+                  bizarreFact: "Though African, the UK's pet grey parrots are infamous for mimicking phones, car alarms, and political arguments. One rescue center had to separate parrots for swearing at visitors nonstop."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "China",
+            lat: 35.8617,
+            lng: 104.1954,
+            facts: [
+              {
+                history: "In 1974, farmers digging a well in Xi’an stumbled upon the Terracotta Army — over 8,000 life-sized clay soldiers buried to protect Emperor Qin Shi Huang in the afterlife. Each soldier has a unique face. Some theories suggest they were modeled after real people, essentially creating an army of immortal clay clones.",
+                animal: {
+                  name: "Pangolin",
+                  scientific: "Manis pentadactyla",
+                  bizarreFact: "Covered in armor-like keratin scales and curls into a tight ball when threatened. Lacks teeth, has a 2-foot-long sticky tongue, and eats 70 million ants a year. It's the most trafficked mammal on Earth."
+                }
+              },
+              {
+                history: "The Great Wall of China isn't one wall — it's a patchwork of over 20,000 kilometers of fortifications built over 2,000 years. In some sections, the mortar was made from sticky rice mixed with lime. Archaeologists say the rice helped the wall survive centuries of weather and warfare.",
+                animal: {
+                  name: "Chinese Water Deer",
+                  scientific: "Hydropotes inermis",
+                  bizarreFact: "Nicknamed the 'vampire deer' — males grow long canine fangs instead of antlers. When startled, they bark like dogs and swim extremely well, paddling across rivers with ease."
+                }
+              },
+              {
+                history: "Ice cream may have originated in ancient China as early as 200 BC. They mixed snow with milk and rice to make a primitive frozen dessert. Later, during the Tang Dynasty, emperors had ‘ice houses’ and servants to churn frozen milk and camphor — essentially the first ice cream machines.",
+                animal: {
+                  name: "Golden Snub-Nosed Monkey",
+                  scientific: "Rhinopithecus roxellana",
+                  bizarreFact: "With a bright orange coat and smushed blue face, it looks like a Muppet. It survives snowy mountains by huddling in groups of over 100 and sneezing — loudly — to stay warm."
+                }
+              },
+              {
+                history: "In 130 BC, Emperor Wu of Han sent the first recorded diplomatic envoy to Central Asia — and accidentally triggered the creation of the Silk Road. The envoy, Zhang Qian, was captured, escaped, and returned over a decade later with news of civilizations previously unknown to China.",
+                animal: {
+                  name: "Chinese Giant Salamander",
+                  scientific: "Andrias davidianus",
+                  bizarreFact: "The world’s largest amphibian — up to 6 feet long — and nearly blind. It communicates with eerie barking sounds and hasn’t changed in 170 million years. Locals call it a 'baby fish' due to its cries."
+                }
+              },
+              {
+                history: "China uses a single time zone — Beijing Time — across the entire country, despite spanning five geographical zones. That means in western regions, the sun can rise at 10 a.m. In Xinjiang, locals follow a separate 'unofficial' time system that’s two hours behind the government.",
+                animal: {
+                  name: "Tibetan Fox",
+                  scientific: "Vulpes ferrilata",
+                  bizarreFact: "With its squarish head and perpetually unimpressed expression, it’s a living meme. It hunts marmots with Tibetan bears — stealing leftovers like a sneaky, furry sidekick."
+                }
+              },
+              {
+                history: "During the Song Dynasty, the Chinese invented a flamethrower by combining gunpowder and Greek fire. It was mounted on ships and called the 'fierce-fire oil squirt.' The design was so effective that similar tech was used by European navies centuries later.",
+                animal: {
+                  name: "Chinese Softshell Turtle",
+                  scientific: "Pelodiscus sinensis",
+                  bizarreFact: "This turtle can pee through its mouth — a bizarre adaptation that allows it to stay underwater longer. It’s nearly flat, lacks scales, and feels like living leather when touched."
+                }
+              },
+              {
+                history: "In the Tang Dynasty, Chinese emperors kept giant mechanical clocks powered by water, weights, and gears — some even tracked stars and simulated the moon’s phases. One such clock tower had rotating spheres that chimed every hour, centuries before European equivalents appeared.",
+                animal: {
+                  name: "Clouded Leopard",
+                  scientific: "Neofelis nebulosa",
+                  bizarreFact: "Has the longest canine teeth (relative to skull size) of any cat. It climbs down trees headfirst and can hang upside down from branches. It’s so elusive, it’s been called the 'ghost of the forest.'"
+                }
+              },
+              {
+                history: "The 'ghost marriage' tradition in rural China involved marrying the deceased — often arranging ceremonies between two dead people or even a living person and a spirit. It was believed to bring peace to wandering souls and avoid spiritual retribution for unmarried deaths.",
+                animal: {
+                  name: "Asian Giant Hornet",
+                  scientific: "Vespa mandarinia",
+                  bizarreFact: "Known as the 'murder hornet,' it can fly at 25 mph and has a venom strong enough to dissolve flesh. A single hornet can kill 40 honeybees per minute and decimate entire hives."
+                }
+              },
+              {
+                history: "In 2008, a Chinese farmer built his own functioning aircraft out of scrap metal, bicycle parts, and a motorcycle engine. It briefly achieved powered flight. Homemade flying machines are a recurring trend in rural China — often resulting in spectacular crashes and viral fame.",
+                animal: {
+                  name: "Pallas’s Cat",
+                  scientific: "Otocolobus manul",
+                  bizarreFact: "Looks permanently grumpy, has round pupils (unlike most cats), and puffs up like a soccer ball in winter. It’s rarely seen because it hides so well it vanishes into rocks — like a feline ninja."
+                }
+              },
+              {
+                history: "During the Ming Dynasty, China constructed 'treasure ships' that dwarfed any European vessels of the time. Admiral Zheng He commanded fleets of these massive wooden ships — some said to be over 400 feet long — decades before Columbus ever set sail.",
+                animal: {
+                  name: "Chinese Crested Tern",
+                  scientific: "Thalasseus bernsteini",
+                  bizarreFact: "Once thought extinct for 63 years, it reappeared in 2000. It has a bright yellow beak and prefers to nest in secret — even hiding behind other birds’ nests to avoid attention."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Russia",
+            lat: 61.5240,
+            lng: 105.3188,
+            facts: [
+              {
+                history: "During World War II, the Soviet military trained dogs to carry explosives under German tanks. The dogs were starved, taught to seek food under tanks, and then fitted with explosives triggered on contact. Many dogs ran back toward their handlers — with tragic results. The idea was later abandoned but remains one of the most bizarre and disturbing military tactics in history.",
+                animal: {
+                  name: "Siberian Musk Deer",
+                  scientific: "Moschus moschiferus",
+                  bizarreFact: "This deer has long vampire-like fangs instead of antlers. Despite its fearsome appearance, it’s shy and uses its tusks for mating battles — not attacks. Its musk gland was once more valuable than gold."
+                }
+              },
+              {
+                history: "Oymyakon, Russia is the coldest inhabited place on Earth. Temperatures have dropped to -89.8°F (-67.7°C). Locals leave cars running for hours to avoid engine freeze, and people can hammer nails into wood with frozen bananas. Ink pens stop working, but vodka never freezes — making it the preferred survival drink.",
+                animal: {
+                  name: "Yakutian Horse",
+                  scientific: "Equus ferus caballus",
+                  bizarreFact: "This native horse grows a coat so thick it survives -70°F winters and can dig through snow with hooves to reach grass. Its nostrils close against ice and wind like built-in snow gear."
+                }
+              },
+              {
+                history: "In 1908, a mysterious explosion flattened over 800 square miles of Siberian forest in what’s now known as the Tunguska Event. Scientists believe it was a meteor or comet, but no impact crater was ever found. Some speculate aliens or underground gas blasts — and the debate continues to this day.",
+                animal: {
+                  name: "Siberian Tiger",
+                  scientific: "Panthera tigris altaica",
+                  bizarreFact: "The largest big cat in the world. It can leap over 30 feet and break a bear’s spine with a single swipe. Its roar can be heard nearly 2 miles away through frozen forest."
+                }
+              },
+              {
+                history: "Lake Karachay in Russia was once the most radioactive place on Earth. Standing beside it for an hour could kill you. Used during the Cold War to dump nuclear waste, it’s now partially entombed in concrete — but radiation still leaks, and no one knows how long it will remain toxic.",
+                animal: {
+                  name: "Russian Desman",
+                  scientific: "Desmana moschata",
+                  bizarreFact: "Looks like a mole crossed with a walrus. It’s aquatic, smells like musk, and uses its nose like a snorkel. It can close its ears and nostrils underwater — and it’s nearly blind."
+                }
+              },
+              {
+                history: "The Soviet Union built a secret research city, 'City 40,' which didn’t exist on any map. Residents had jobs, homes, and schools — but couldn’t leave or tell outsiders where they were. It was used for nuclear weapons research and is still closed to foreigners today.",
+                animal: {
+                  name: "Baikal Seal (Nerpa)",
+                  scientific: "Pusa sibirica",
+                  bizarreFact: "The only freshwater seal species in the world. It lives exclusively in Lake Baikal, uses teeth to chew through ice, and can dive for over 40 minutes despite its chubby appearance."
+                }
+              },
+              {
+                history: "Russia spans 11 time zones and two continents — so vast that at one end, people are waking up while others prepare dinner. In 2010, the government eliminated 2 time zones to simplify matters. Many Russians still calculate 'Moscow time' separately from their own — even on train tickets.",
+                animal: {
+                  name: "Amur Leopard",
+                  scientific: "Panthera pardus orientalis",
+                  bizarreFact: "One of the rarest big cats on Earth — fewer than 100 remain. It can leap 10 feet vertically and survives harsh winters with thick, spotted fur that camouflages in snow."
+                }
+              },
+              {
+                history: "In the 1700s, Catherine the Great's court invented the 'Potemkin village' — elaborate fake towns built to impress visiting officials. Facades were placed along roadsides to suggest prosperity. Entire fake farms and smiling peasants were staged — even though real villages nearby were starving.",
+                animal: {
+                  name: "Eurasian Lynx",
+                  scientific: "Lynx lynx",
+                  bizarreFact: "With snowshoe paws and tufted ears, it moves silently across snow. It can hear prey under thick ice and attack without a sound. Its stare has earned it the nickname 'ghost cat.'"
+                }
+              },
+              {
+                history: "The Kola Superdeep Borehole is the deepest manmade hole ever drilled — over 7.5 miles deep into Earth’s crust. Soviet scientists hoped to study the mantle, but hit unexpected temperatures. Rumors spread that workers heard 'screams from Hell' — likely due to drill noise echoing oddly.",
+                animal: {
+                  name: "Blind Cave Fish (Altai)",
+                  scientific: "Triplophysa rosa",
+                  bizarreFact: "Lives in lightless underground rivers of Siberia. It’s completely blind, has no pigment, and uses vibration-sensitive fins to feel its way around. It’s only been seen by a handful of scientists."
+                }
+              },
+              {
+                history: "In 1986, a Soviet pilot stole a fighter jet and defected to Japan — without permission. He left a note for his mother and landed the aircraft on a civilian airstrip. The jet was later returned, but U.S. engineers secretly studied it first.",
+                animal: {
+                  name: "Russian Flying Squirrel",
+                  scientific: "Pteromys volans",
+                  bizarreFact: "Glides over 150 feet between trees using skin flaps called patagia. It’s nearly silent and often mistaken for a leaf in motion. It sings with ultrasonic chirps and has glow-in-the-dark fur under UV light."
+                }
+              },
+              {
+                history: "A meteor exploded over Chelyabinsk in 2013 with the force of 30 Hiroshima bombs — and no one saw it coming. It shattered windows across the city, injured over 1,000 people, and was caught on hundreds of dashcams — because in Russia, everyone has a dashcam for legal protection.",
+                animal: {
+                  name: "Brown Bear",
+                  scientific: "Ursus arctos",
+                  bizarreFact: "Russia’s national animal, it can run 30 mph, climb trees, and open car doors. In Siberia, locals report them mimicking human behavior — including watching cabins before breaking in to steal food."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Mexico",
+            lat: 23.6345,
+            lng: -102.5528,
+            facts: [
+              {
+                history: "The Aztecs used cacao beans as currency — literally drinking their money. A turkey was worth about 200 beans, and a prostitute could cost 10. So valuable was chocolate that counterfeit beans were made from carved clay or avocado pits painted brown. Today, Mexico still celebrates cacao as sacred in rituals and festivals.",
+                animal: {
+                  name: "Axolotl",
+                  scientific: "Ambystoma mexicanum",
+                  bizarreFact: "It never grows up. Axolotls remain in their larval stage for life — retaining gills while maturing sexually. They can regenerate their brain, spine, limbs, and even part of their heart. They always look like they're smiling."
+                }
+              },
+              {
+                history: "Mexico City is sinking — by as much as 10 inches per year. Built atop an ancient lakebed by the Aztecs, it floats on clay-rich soil that compresses under modern weight. Entire neighborhoods have slanted sidewalks, sunken doors, and buildings leaning like drunken dominoes. It’s one of the fastest-sinking cities on Earth.",
+                animal: {
+                  name: "Coati",
+                  scientific: "Nasua narica",
+                  bizarreFact: "A raccoon-like mammal with a prehensile tail and a nose like a vacuum hose. It uses its nose to dig for grubs and walks upright when carrying food. Groups of females are called 'bands' and sometimes raid campsites like ninja raccoons."
+                }
+              },
+              {
+                history: "The Day of the Dead is a UNESCO-recognized cultural heritage celebration. It blends ancient Aztec traditions with Catholic rituals, turning cemeteries into neon-lit festivals with music, dancing, and picnics atop graves. Some families build altars for deceased pets — complete with toys, water, and favorite snacks.",
+                animal: {
+                  name: "Mexican Hairless Dog",
+                  scientific: "Xoloitzcuintli",
+                  bizarreFact: "This ancient, bald dog breed was considered sacred by the Aztecs and believed to guide souls to the afterlife. Its skin feels like warm rubber, and some owners say sleeping next to it helps joint pain."
+                }
+              },
+              {
+                history: "In Puebla, locals celebrate the annual 'Battle of the Cakes' — a food fight commemorating a bakery strike in the 1800s. Legend has it that French soldiers demanded compensation for pastries stolen by Mexican officers, leading to the Pastry War — a real military conflict sparked by dessert.",
+                animal: {
+                  name: "Mexican Red-Knee Tarantula",
+                  scientific: "Brachypelma smithi",
+                  bizarreFact: "Flicks itchy hairs from its legs as a defense mechanism. Often mistaken for a toy due to its bright colors, it’s calm enough to be a beginner's pet but can hiss when annoyed."
+                }
+              },
+              {
+                history: "Mexico has a volcano that can erupt without warning — and its name means 'smoking mountain.' Popocatépetl has erupted over 20 times since 1519, often with fiery lightning storms. Ancient Mexicans believed it was a warrior god who weeps fire for his lost lover, the Iztaccíhuatl mountain.",
+                animal: {
+                  name: "Mexican Mole Lizard",
+                  scientific: "Bipes biporus",
+                  bizarreFact: "It’s pink, legless (except for tiny front arms), and lives underground. Often mistaken for an earthworm with claws, it swims through sand and has eyes so small they’re nearly invisible."
+                }
+              },
+              {
+                history: "In the 1500s, Hernán Cortés burned his ships after landing in Mexico to prevent retreat. The phrase 'burn your ships' comes from this — symbolizing total commitment. Ironically, some historians believe he didn’t burn them but sank them, proving even myths have mixed truths in Mexico’s history.",
+                animal: {
+                  name: "Leafcutter Ant",
+                  scientific: "Atta mexicana",
+                  bizarreFact: "Carries leaves 50 times its body weight back to its fungus farms underground. They don’t eat the leaves — they grow mushrooms on them. It's agriculture... for ants."
+                }
+              },
+              {
+                history: "The ancient city of Teotihuacán had a hidden tunnel discovered in 2003 — filled with liquid mercury, pyrite spheres, and mysterious carvings. Some believe it represented the underworld. Others think it was an astronomical observatory. No one knows who even built the city — the Aztecs just found it.",
+                animal: {
+                  name: "Vampire Bat",
+                  scientific: "Desmodus rotundus",
+                  bizarreFact: "Feeds on blood by slicing skin with razor teeth and licking the wound. Its saliva has a painkiller so strong it's being tested for heart medicine. It can walk and even hop like a spider."
+                }
+              },
+              {
+                history: "Cuexcomate, Mexico’s 'smallest volcano,' stands only 43 feet tall — like a backyard hill. Locals joke that it’s the world’s least intimidating volcano. Some stories claim it was once used as a trash pit, while others say it was a sacrificial altar for condemned criminals.",
+                animal: {
+                  name: "Mexican Burrowing Toad",
+                  scientific: "Rhinophrynus dorsalis",
+                  bizarreFact: "Inflates itself like a balloon when threatened and lives underground for years between rains. It emerges only to breed — creating a chorus that sounds like air escaping a tire."
+                }
+              },
+              {
+                history: "In 2017, a massive earthquake rocked Mexico City — and search dogs like Frida the Labrador became national heroes. Wearing goggles and boots, she helped locate 52 people. She later retired with full honors and a statue in her name.",
+                animal: {
+                  name: "Ctenosaura",
+                  scientific: "Ctenosaura pectinata",
+                  bizarreFact: "Also called the Mexican spiny-tailed iguana, it’s one of the fastest lizards alive — clocked at over 20 mph. Males can change color when angry and whip their tails like weapons."
+                }
+              },
+              {
+                history: "Mexico’s Constitution includes the right to a clean environment, cultural identity, and access to art. Article 4 guarantees the people’s access to culture and biodiversity — a rare feature among world constitutions. Some argue it reflects pre-Columbian ideas about living in balance with nature.",
+                animal: {
+                  name: "Ocelot",
+                  scientific: "Leopardus pardalis",
+                  bizarreFact: "A small wild cat with fur like a leopard and eyes that glow like headlights. It chirps like a bird and stalks prey like a ghost in the jungle. It can climb, swim, and even mimic monkey calls."
+                }
+              }
+            ]
+
+          },
+          {
+            name: "Italy",
+            lat: 41.8719,
+            lng: 12.5674,
+            facts: [
+              {
+                history: "In 1325, the cities of Modena and Bologna fought a war over a wooden bucket. Yes — a literal oak bucket stolen from a city well. The War of the Oaken Bucket lasted 12 years and included full-scale battles. The bucket is still on display in Modena's city hall, guarded like a relic of absurdity and pride.",
+                animal: {
+                  name: "Sicilian Donkey",
+                  scientific: "Equus asinus",
+                  bizarreFact: "A rare donkey with snowy white fur and pink eyes, once bred by royalty. Its bray can echo for miles through mountain valleys — a sound so unique it’s been compared to a foghorn and a scream."
+                }
+              },
+              {
+                history: "In ancient Rome, vomiting was considered polite between courses. Wealthy Romans would excuse themselves to designated vomitoriums (no, not bathrooms) to purge and continue eating. They threw lavish feasts with flamingo tongues, honey-roasted dormice, and jellyfish. Some banquets lasted days.",
+                animal: {
+                  name: "Italian Cave Salamander",
+                  scientific: "Speleomantes italicus",
+                  bizarreFact: "Lives in dark limestone caves, breathes through its skin, and sticks to walls like Spider-Man. It has a projectile tongue half its body length and can snap it out in less than 0.1 seconds."
+                }
+              },
+              {
+                history: "Venice is slowly sinking — about 1–2 millimeters per year — but also tilting eastward. Combined with rising sea levels, it now floods over 60 times a year. Locals walk on raised platforms called passerelle and use apps to track which streets are underwater.",
+                animal: {
+                  name: "Moorish Gecko",
+                  scientific: "Tarentola mauritanica",
+                  bizarreFact: "Common on Italian walls, it chirps loudly and can detach its tail, which continues twitching to distract predators. Its toes stick using microscopic hairs, letting it run across ceilings like a lizard ninja."
+                }
+              },
+              {
+                history: "The Vatican has its own army, currency, and observatory — and it's the only country on Earth where ATMs offer Latin as a language option. The Swiss Guard, dressed in Renaissance armor, is trained in martial arts and modern weapons despite looking like court jesters.",
+                animal: {
+                  name: "Alpine Ibex",
+                  scientific: "Capra ibex",
+                  bizarreFact: "Can climb vertical dam walls — almost like gravity doesn’t apply. Its hooves act like suction cups, and kids as young as 3 days old can scale cliffs to avoid predators."
+                }
+              },
+              {
+                history: "During World War II, Allied troops accidentally bombed Pisa — but the Leaning Tower survived because both sides avoided targeting it out of admiration. A Nazi sniper once used it as a lookout, and an American artillery officer refused to fire, saving the tower.",
+                animal: {
+                  name: "European Eel",
+                  scientific: "Anguilla anguilla",
+                  bizarreFact: "Spawns only once — in the Sargasso Sea — and dies. No one has ever seen the spawning happen. Italian eels were once so prized that Michelangelo wrote about them in letters."
+                }
+              },
+              {
+                history: "In 1986, a town in Sicily was repeatedly struck by mysterious fires. TVs, toasters, even furniture ignited spontaneously. Locals blamed ghosts or secret military tech. The government evacuated the town — but later, it turned out to be a teenager secretly setting things alight for attention.",
+                animal: {
+                  name: "Italian Wall Lizard",
+                  scientific: "Podarcis siculus",
+                  bizarreFact: "In one study, transplanted lizards evolved new organs in just 36 years. Their jaws changed, digestive tracts adapted — an example of evolution in fast-forward, all on a tiny island."
+                }
+              },
+              {
+                history: "Italy has 58 UNESCO World Heritage Sites — more than any other country. Some, like the Valley of the Temples in Sicily, are so well-preserved they still host modern concerts. Others include a giant underground necropolis, trulli villages, and the world's oldest university (Bologna, 1088).",
+                animal: {
+                  name: "Etruscan Shrew",
+                  scientific: "Suncus etruscus",
+                  bizarreFact: "Weighs less than a teaspoon of sugar. Its heart beats over 1,500 times per minute — the fastest of any mammal. It's so small it can run across the surface of water briefly."
+                }
+              },
+              {
+                history: "The Palio di Siena, Italy’s most dangerous horse race, is run bareback around a stone plaza packed with screaming crowds. Horses often crash into walls, and only the horse — not the rider — must finish to win. Injuries are common, and winning grants the district immense honor.",
+                animal: {
+                  name: "Apennine Wolf",
+                  scientific: "Canis lupus italicus",
+                  bizarreFact: "Italy's native wolf subspecies, it once vanished from the Alps but reappeared thanks to conservation. It’s smaller than other wolves and howls in shorter, sharper bursts — a ‘fast-talking’ wolf dialect."
+                }
+              },
+              {
+                history: "Mount Vesuvius is the only active volcano in mainland Europe — and overdue for eruption. When it buried Pompeii in 79 AD, the heat was so intense it vaporized brains and crystallized skulls. Today, over 3 million people live in its danger zone.",
+                animal: {
+                  name: "Italian Greyhound",
+                  scientific: "Canis lupus familiaris",
+                  bizarreFact: "Looks fragile but can sprint up to 25 mph. Bred for nobility, these dogs were once mummified with Roman emperors. Their bones have been found in ancient ruins alongside golden collars."
+                }
+              },
+              {
+                history: "In Rome, it's illegal to keep a goldfish in a round bowl. The city considers it animal cruelty, as the curved glass distorts their vision. Italians love their pets — and in Milan, owners must legally walk their dogs or face fines. It’s a city where even pigeons have rights.",
+                animal: {
+                  name: "Common Toad",
+                  scientific: "Bufo bufo",
+                  bizarreFact: "Toads in Italy were once believed to spit poison or predict earthquakes. They hibernate under churches and emerge during spring rains — often migrating in such numbers that cities create ‘toad tunnels’ beneath roads."
+                }
+              }
+            ]
+
+          }
+
+
+        ]
+      };
+
+
+
+      function createCircleMarker(region) {
+        const spriteMaterial = new THREE.SpriteMaterial({
+          map: new THREE.TextureLoader().load(
+            mode === 'normal'
+              ? '/vecteezy_button-pin-clipart-design-illustration_9394203.png'
+              : '/vecteezy_circle-that-has-orange-color_44313728.png'
+          ),
+          transparent: true,
+          opacity: 1
+        });
+
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1.2, 1.2, 1); // size in screen units
+
+        // Convert lat/lng to 3D position
+        const phi = (90 - region.lat) * (Math.PI / 180);
+        const theta = (region.lng + 180) * (Math.PI / 180);
+        const radius = 50; // right on surface
+
+        sprite.position.set(
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.cos(phi),
+          radius * Math.sin(phi) * Math.sin(theta)
+        );
+
+
+
+        sprite.userData = { region: region.name };
+
+        return sprite;
+      }
+
+
+
+
+      function createArrowMarkers() {
+        // Clear existing markers
+        arrowMarkers.forEach(marker => scene.remove(marker));
+        arrowMarkers = [];
+
+        factsData[mode].forEach(region => {
+          const arrowMarker = createCircleMarker(region);
+          arrowMarkers.push(arrowMarker);
+          scene.add(arrowMarker);
+        });
+      }
+
+
+
+      // Labeling function for countries
+      function createTextLabel(name, lat, lng) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+
+        // Clear and smooth canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+
+        // Set font and alignment
+        ctx.font = '28px Arial';
+        ctx.fillStyle = '#e4e4e4';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle'; // ✅ key to fix vertical cutoff
+
+        // Draw text at center of canvas
+        ctx.fillText(name, canvas.width / 2, canvas.height / 2); // ✅ vertical center
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(material);
+
+        // Position on globe
+        const radius = 52;
+        const phi = (90 - lat) * Math.PI / 180;
+        const theta = (lng + 180) * Math.PI / 180;
+
+        sprite.position.set(
+          -radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.cos(phi),
+          radius * Math.sin(phi) * Math.sin(theta)
+        );
+
+        sprite.scale.set(6, 3, 1);     // Small and readable
+        earthMesh.add(sprite);         // ✅ So it rotates with the Earth
+      }
+
+
+
+
+      function updateStreak() {
+        streak++;
+        streakDisplay.textContent = `🔥 Streak: ${streak}`;
+
+        // Add streak animation
+        streakDisplay.style.transform = 'scale(1.2)';
+        setTimeout(() => {
+          streakDisplay.style.transform = 'scale(1)';
+        }, 200);
+      }
+
+      function showFact(regionName) {
+        const region = factsData[mode].find(r => r.name === regionName);
+        if (!region) return;
+
+        currentRegion = regionName;
+        let content = `<strong style="color: #00ffcc; font-size: 18px;">${region.name}</strong><br/><br/>`;
+        bizarreFactIndex = 0;
+
+        if (mode === 'normal') {
+          const randomFact = region.facts[Math.floor(Math.random() * region.facts.length)];
+          content += `<span style="color: #ffffff;">${randomFact}</span>`;
+        } else {
+          const factArray = region.facts;
+          if (!factArray || factArray.length === 0) return;
+
+          if (bizarreFactIndex >= factArray.length) bizarreFactIndex = 0;
+          const randomIndex = Math.floor(Math.random() * region.facts.length);
+          const f = region.facts[randomIndex];
+
+          content += `<div style="margin-bottom: 10px;"><strong style="color: #ff6b6b;">🏛️ Bizarre History:</strong><br/>${f.history}</div>`;
+          content += `<div style="margin-bottom: 10px;"><strong style="color: #4ecdc4;">🐾 Weird Animal:</strong><br/>${f.animal.name} <em>(${f.animal.scientific})</em></div>`;
+          content += `<div><strong style="color: #ffe66d;">🤯 Bizarre Fact:</strong><br/>${f.animal.bizarreFact}</div>`;
+
+          bizarreFactIndex++;
+        }
+
+        infoBox.innerHTML = content;
+        infoBox.style.display = 'block';
+        infoBox.classList.add('show');
+        updateStreak();
+      }
+
+      // Click detection - only on arrow markers
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      let clickTimeout;
+      let hasDragged = false;
+
+      renderer.domElement.addEventListener('mousedown', () => {
+        hasDragged = false;
+      });
+
+      renderer.domElement.addEventListener('mousemove', () => {
+        if (isDragging) {
+          hasDragged = true;
+        }
+      });
+
+      renderer.domElement.addEventListener('click', (event) => {
+        // Only process clicks if we haven't dragged
+        if (hasDragged) return;
+
+        clearTimeout(clickTimeout);
+        clickTimeout = setTimeout(() => {
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+          raycaster.setFromCamera(mouse, camera);
+
+          // Check only arrow markers
+          const arrowIntersects = raycaster.intersectObjects(arrowMarkers, true);
+          if (arrowIntersects.length > 0) {
+            let hitMarker = arrowIntersects[0].object;
+            // Find the parent group that contains the region data
+            while (hitMarker && !hitMarker.userData.region) {
+              hitMarker = hitMarker.parent;
+            }
+            if (hitMarker && hitMarker.userData.region) {
+              showFact(hitMarker.userData.region);
+            }
+          }
+        }, 100);
+      });
+
+
+
+      // Enhanced search - only show covered regions
+      // Enhanced search - only show covered regions
+      let searchTimeout;
+      const searchContainer = document.getElementById('searchContainer');
+
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+          searchResults.style.display = 'none';
+          return;
+        }
+
+        searchTimeout = setTimeout(() => {
+          // Filter only covered regions that match the search query
+          const filteredRegions = factsData[mode].filter(region =>
+            region.name.toLowerCase().includes(query.toLowerCase())
+          );
+
+          searchResults.innerHTML = '';
+
+          if (filteredRegions.length > 0) {
+            filteredRegions.forEach(region => {
+              const item = document.createElement('div');
+              item.className = 'search-item';
+
+              // Get additional info based on region name
+              let additionalInfo = '';
+              const regionInfo = {
+                'Japan': 'Capital: Tokyo • Asia',
+                'Brazil': 'Capital: Brasília • South America',
+                'Egypt': 'Capital: Cairo • Africa',
+                'Australia': 'Capital: Canberra • Oceania',
+                'Norway': 'Capital: Oslo • Europe',
+                'India': 'Capital: New Delhi • Asia',
+                'Canada': 'Capital: Ottawa • North America',
+                'South Africa': 'Capital: Cape Town • Africa',
+                'Argentina': 'Capital: Buenos Aires • South America',
+                'Indonesia': 'Capital: Jakarta • Asia',
+                'Germany': 'Capital: Berlin • Europe',
+                'United Kingdom': 'Capital: London • Europe',
+                'China': 'Capital: Beijing • Asia',
+                'Russia': 'Capital: Moscow • Europe/Asia',
+                'Mexico': 'Capital: Mexico City • North America',
+                'Italy': 'Capital: Rome • Europe'
+              };
+
+              additionalInfo = regionInfo[region.name] || 'Covered Region';
+
+              item.innerHTML = `
+          <div style="font-weight: bold;">${region.name}</div>
+          <div style="font-size: 12px; color: #aaa;">${additionalInfo}</div>
+        `;
+
+              item.addEventListener('click', () => {
+                searchInput.value = region.name;
+                searchResults.style.display = 'none';
+
+                // Reset to standard position first, then move to target
+                const targetLat = region.lat;
+                const targetLng = region.lng;
+
+                autoRotate = false;
+
+                // Animation parameters
+                const animationDuration = 1500; // 1.5 seconds
+                const startTime = Date.now();
+                const startCameraDistance = cameraDistance;
+
+                const startRotationX = earthRotation.x;
+                const startRotationY = earthRotation.y;
+
+                const latRad = THREE.MathUtils.degToRad(targetLat);
+                const lngRad = THREE.MathUtils.degToRad(targetLng);
+
+                const targetRotationX = latRad;     // latitude becomes X rotation
+
+                const globeOffset = THREE.MathUtils.degToRad(-90); // adjust this value to correct the shift
+                const targetRotationY = -lngRad + globeOffset;
+
+                const targetCameraDistance = 100;
+
+
+
+
+                function animateToLocation() {
+                  const elapsed = Date.now() - startTime;
+                  const progress = Math.min(elapsed / animationDuration, 1);
+
+                  const easeInOut = progress < 0.5
+                    ? 2 * progress * progress
+                    : -1 + (4 - 2 * progress) * progress;
+
+                  earthRotation.x = startRotationX + (targetRotationX - startRotationX) * easeInOut;
+                  earthRotation.y = startRotationY + (targetRotationY - startRotationY) * easeInOut;
+                  cameraDistance = startCameraDistance + (targetCameraDistance - startCameraDistance) * easeInOut;
+                  camera.position.z = cameraDistance;
+
+                  if (progress < 1) {
+                    requestAnimationFrame(animateToLocation);
+                  } else {
+                    showFact(region.name);
+                  }
+                }
+
+
+                animateToLocation();
+              });
+
+              searchResults.appendChild(item);
+            });
+
+            searchResults.style.display = 'block';
+          } else {
+            searchResults.style.display = 'none';
+          }
+        }, 300);
+      });
+
+
+
+      // Hide search results when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!searchContainer.contains(e.target)) {
+          searchResults.style.display = 'none';
+        }
+      });
+
+      // Controls
+      toggleBtn.onclick = () => {
+        mode = mode === 'normal' ? 'bizarre' : 'normal';
+        toggleBtn.textContent = `Switch to ${mode === 'normal' ? 'Bizarre' : 'Normal'} Mode`;
+        toggleBtn.style.background = mode === 'normal' ? 'rgba(17, 17, 17, 0.9)' : 'rgba(255, 0, 0, 0.2)';
+        createArrowMarkers();
+        infoBox.style.display = 'none';
+        infoBox.classList.remove('show');
+      };
+
+
+      document.getElementById('randomSpin').onclick = () => {
+        autoRotate = false;
+
+        // Create a smooth spinning animation
+        const spinDuration = 2000; // 2 seconds
+        const spinRotations = 3; // Number of full rotations
+        const startTime = Date.now();
+        const startRotationX = earthRotation.x;
+        const startRotationY = earthRotation.y;
+
+        // Random target rotation
+        const targetRotationX = (Math.random() - 0.5) * Math.PI * 2;
+        const targetRotationY = earthRotation.y + (Math.PI * 2 * spinRotations) + (Math.random() * Math.PI * 2);
+
+        function spinAnimation() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / spinDuration, 1);
+
+          // Easing function for smooth deceleration
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+
+          // Interpolate rotation
+          earthRotation.x = startRotationX + (targetRotationX - startRotationX) * easeOut;
+          earthRotation.y = startRotationY + (targetRotationY - startRotationY) * easeOut;
+
+          if (progress < 1) {
+            requestAnimationFrame(spinAnimation);
+          } else {
+            // Show a random fact after spin completes
+            const randomRegion = factsData[mode][Math.floor(Math.random() * factsData[mode].length)];
+            setTimeout(() => showFact(randomRegion.name), 500);
+          }
+        }
+
+        spinAnimation();
+      };
+
+
+
+      // Replace your existing focusBtn onclick handler with this:
+
+      focusBtn.onclick = () => {
+        // Reset to normal view with smooth animation
+        const resetDuration = 1000; // 1 second
+        const startTime = Date.now();
+        const startRotationX = earthRotation.x;
+        const startRotationY = earthRotation.y;
+        const startCameraDistance = cameraDistance;
+
+        // Target: standard view position
+        const targetRotationX = 0;
+        const targetRotationY = 0;
+        const targetCameraDistance = 150;
+
+        function resetAnimation() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / resetDuration, 1);
+
+          // Easing function for smooth movement
+          const easeInOut = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+          // Interpolate rotation and camera distance
+          earthRotation.x = startRotationX + (targetRotationX - startRotationX) * easeInOut;
+          earthRotation.y = startRotationY + (targetRotationY - startRotationY) * easeInOut;
+          cameraDistance = startCameraDistance + (targetCameraDistance - startCameraDistance) * easeInOut;
+          camera.position.z = cameraDistance;
+
+          if (progress < 1) {
+            requestAnimationFrame(resetAnimation);
+          } else {
+            // Enable auto-rotation after reset completes
+            autoRotate = true;
+          }
+        }
+
+        // Start the reset animation
+        autoRotate = false;
+        resetAnimation();
+      };
+
+
+
+
+      // Initialize
+      createArrowMarkers();
+      streakDisplay.textContent = `🔥 Streak: ${streak}`;
+      // Add country labels
+      createTextLabel("Japan", 35.6895, 139.6917);
+      createTextLabel("Brazil", -14.235, -51.9253);
+      createTextLabel("Egypt", 26.8206, 30.8025);
+      createTextLabel("Australia", -25.2744, 133.7751);
+      createTextLabel("Norway", 60.4720, 8.4689);
+      createTextLabel("India", 20.5937, 78.9629);
+      createTextLabel("Canada", 56.1304, -106.3468);
+      createTextLabel("South Africa", -30.5595, 22.9375);
+      createTextLabel("Argentina", -38.4161, -63.6167);
+      createTextLabel("Indonesia", -0.7893, 113.9213);
+      createTextLabel("Germany", 51.1657, 10.4515);
+      createTextLabel("United Kingdom", 55.3781, -3.4360);
+      createTextLabel("China", 35.8617, 104.1954);
+      createTextLabel("Russia", 61.5240, 105.3188);
+      createTextLabel("Mexico", 23.6345, -102.5528);
+      createTextLabel("Italy", 41.8719, 12.5674);
+
+
+      let usingHighRes = false; // Keep track of which texture is active
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Apply rotation to Earth and atmosphere
+        earthMesh.rotation.x = earthRotation.x;
+        earthMesh.rotation.y = earthRotation.y;
+        atmosphere.rotation.x = earthRotation.x;
+        atmosphere.rotation.y = earthRotation.y;
+
+
+
+        arrowMarkers.forEach((sprite) => {
+          const camDir = camera.position.clone().sub(sprite.position).normalize(); // vector from sprite to camera
+          const globeCenter = new THREE.Vector3(0, 0, 0);
+          const spriteNormal = sprite.position.clone().normalize(); // vector from globe center to sprite
+
+          const dot = camDir.dot(spriteNormal); // angle between camera direction and sprite normal
+
+          // Show only if camera is facing the front side
+          sprite.visible = dot > 0;
+        });
+
+
+
+        // Update arrow markers to follow Earth rotation
+        arrowMarkers.forEach((marker, index) => {
+          const region = factsData[mode][index];
+          const phi = (90 - region.lat) * (Math.PI / 180);
+          const theta = (region.lng + 180) * (Math.PI / 180);
+          const radius = 58;
+
+          // Apply Earth's rotation to marker position
+          const rotatedX = -(radius * Math.sin(phi) * Math.cos(theta + earthRotation.y));
+          const rotatedZ = radius * Math.sin(phi) * Math.sin(theta + earthRotation.y);
+          const rotatedY = radius * Math.cos(phi) * Math.cos(earthRotation.x) -
+            radius * Math.sin(phi) * Math.sin(earthRotation.x) * Math.sin(theta + earthRotation.y);
+
+          marker.position.x = rotatedX;
+          marker.position.z = rotatedZ;
+          marker.position.y = rotatedY;
+
+          // Make arrow point toward Earth center
+          marker.lookAt(new THREE.Vector3(0, 0, 0));
+          marker.rotateX(Math.PI); // Flip it inward again per frame
+
+
+
+          // Add bouncing animation
+          const bounce = Math.sin(Date.now() * 0.005 + index) * 2;
+          marker.position.normalize().multiplyScalar(radius + bounce);
+
+          // Add slight rotation animation
+          marker.children.forEach(child => {
+            child.rotation.y = Date.now() * 0.001 + index;
+          });
+        });
+
+        // Auto-rotate slowly when enabled
+        if (autoRotate && !isDragging) {
+          earthRotation.y += 0.003;
+        }
+
+        // Add momentum to rotation when not dragging
+        if (!isDragging) {
+          rotationVelocity.x *= 0.95;
+          rotationVelocity.y *= 0.95;
+
+          if (Math.abs(rotationVelocity.x) > 0.001 || Math.abs(rotationVelocity.y) > 0.001) {
+            earthRotation.x += rotationVelocity.x;
+            earthRotation.y += rotationVelocity.y;
+          }
+        }
+
+        // Rotate stars slowly
+        stars.rotation.y += 0.0002;
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    });
+  </script>
+</body>
+
+</html>

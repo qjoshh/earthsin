@@ -2680,8 +2680,9 @@ renderer.domElement.addEventListener('touchend', (e) => {
   const fullscreenBtn = document.getElementById('fullscreenBtn');
 
   fullscreenBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      // ENTER Fullscreen
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+    if (!isFullscreen) {
       const docEl = document.documentElement;
       if (docEl.requestFullscreen) {
         docEl.requestFullscreen();
@@ -2691,7 +2692,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
         docEl.msRequestFullscreen();
       }
     } else {
-      // EXIT Fullscreen
       if (document.exitFullscreen) {
         document.exitFullscreen();
       } else if (document.webkitExitFullscreen) {
@@ -2702,6 +2702,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
+
   
 </body>
 

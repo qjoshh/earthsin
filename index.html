@@ -369,20 +369,36 @@
       }, { passive: false });
 
       let lastTapTime = 0;
+      let tapTimeout = null;
 
-      renderer.domElement.addEventListener('touchend', () => {
+      renderer.domElement.addEventListener('touchend', (e) => {
         isDragging = false;
 
-        // 👇 Add double-tap detection here
+        // Only respond to single-finger taps
+        if (e.touches.length > 0 || e.changedTouches.length > 1) return;
+
         const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTapTime;
+        const tapGap = currentTime - lastTapTime;
 
-        if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) {
+        if (tapGap < 300) {
+          // ✅ Double tap detected
           autoRotate = !autoRotate;
-        }
+          lastTapTime = 0;
 
-        lastTapTime = currentTime;
-      });
+          // Optional: Feedback
+          console.log('Double-tap detected. Auto-rotate:', autoRotate);
+        } else {
+          lastTapTime = currentTime;
+
+          // Clear timeout just in case
+          if (tapTimeout) clearTimeout(tapTimeout);
+
+          // Optional: fallback single tap action here, if needed
+          tapTimeout = setTimeout(() => {
+            tapTimeout = null;
+          }, 300);
+        }
+      }, { passive: false });
 
 
       let lastPinchDistance = null;

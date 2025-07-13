@@ -2872,22 +2872,17 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
     let isVisible = false;
 
-    function toggleVisibility(el, show) {
-      if (show) {
-        el.style.display = 'block';
-        requestAnimationFrame(() => el.classList.add('visible'));
-      } else {
-        el.classList.remove('visible');
-        setTimeout(() => {
-          el.style.display = 'none';
-        }, 400); // Match transition duration
-      }
-    }
-
     moreBtn.addEventListener('click', () => {
       isVisible = !isVisible;
-      toggleVisibility(streakCounter, isVisible);
-      toggleVisibility(instructions, isVisible);
+
+      if (isVisible) {
+        streakCounter.classList.add('visible');
+        instructions.classList.add('visible');
+      } else {
+        streakCounter.classList.remove('visible');
+        instructions.classList.remove('visible');
+      }
+
       moreBtn.textContent = isVisible ? 'Hide Info' : 'More Info';
     });
   </script>

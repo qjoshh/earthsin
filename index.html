@@ -424,11 +424,32 @@ renderer.domElement.addEventListener('touchend', (e) => {
     lastPinchDistance = null;
   }
 });
-
-
-      // Double-click to toggle auto-rotation
-      renderer.domElement.addEventListener('dblclick', () => {
+    
+      // Double-click to toggle auto-rotation (desktop)
+      renderer.domElement.addEventListener('dblclick', (event) => {
+        event.preventDefault();
         autoRotate = !autoRotate;
+      });
+
+      // Touch events for mobile double-tap - always START rotation
+      let lastTouchTime = 0;
+
+      renderer.domElement.addEventListener('touchend', (event) => {
+        // Only process if we haven't dragged
+        if (hasDragged) {
+          lastTouchTime = new Date().getTime();
+          return;
+        }
+
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTouchTime;
+
+        if (tapLength < 500 && tapLength > 0) {
+          // Double tap detected - ALWAYS start rotation (don't toggle)
+          event.preventDefault();
+          autoRotate = true;
+        }
+        lastTouchTime = currentTime;
       });
 
       let mode = 'normal';
@@ -2547,11 +2568,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
       function animate() {
         requestAnimationFrame(animate);
 
-
-        // ✅ Add auto-rotation
-        if (autoRotate && !isDragging) {
-          earthRotation.y += 0.002;
-        }
         
         // Apply rotation to Earth and atmosphere
         earthMesh.rotation.x = earthRotation.x;

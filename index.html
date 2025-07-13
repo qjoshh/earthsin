@@ -330,6 +330,37 @@
         camera.position.z = cameraDistance;
       });
 
+      // TOUCH SUPPORT FOR MOBILE DEVICES
+      renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          autoRotate = false;
+          previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      }, { passive: false });
+
+      renderer.domElement.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          e.preventDefault(); // Prevents scrolling
+          const deltaMove = {
+            x: e.touches[0].clientX - previousMousePosition.x,
+            y: e.touches[0].clientY - previousMousePosition.y
+          };
+
+          rotationVelocity.x = deltaMove.y * 0.01;
+          rotationVelocity.y = deltaMove.x * 0.01;
+
+          earthRotation.x += rotationVelocity.x;
+          earthRotation.y += rotationVelocity.y;
+
+          previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+      }, { passive: false });
+
+      renderer.domElement.addEventListener('touchend', () => {
+        isDragging = false;
+      });
+
       // Double-click to toggle auto-rotation
       renderer.domElement.addEventListener('dblclick', () => {
         autoRotate = !autoRotate;
@@ -2140,6 +2171,21 @@
         infoBox.classList.add('show');
         updateStreak();
       }
+
+      // Close infoBox when clicking anywhere outside it
+      document.addEventListener('click', (e) => {
+        // Only hide if the click is NOT inside the infoBox
+        if (
+          !infoBox.contains(e.target) &&
+          !searchContainer.contains(e.target) &&
+          e.target.id !== 'randomSpin'
+        ) {
+          infoBox.style.display = 'none';
+          infoBox.classList.remove('show');
+        }
+
+      });
+
 
       // Click detection - only on arrow markers
       const raycaster = new THREE.Raycaster();

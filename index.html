@@ -2732,26 +2732,34 @@ renderer.domElement.addEventListener('touchend', (e) => {
     return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
-  // ✅ This was missing!
   function getQueryParam(name) {
     return new URLSearchParams(window.location.search).get(name);
   }
 
-  const bloggerURL = "https://www.biobzarre.com/p/earth-sim.html?m=1"; // Replace this!
+  // ✅ Set button text dynamically based on context
+  const fromBlogger = getQueryParam('from') === 'blogger';
+  if (isMobile() && fromBlogger) {
+    fullscreenBtn.innerHTML = `
+      <svg fill="white" height="18" width="18" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1 1v5h2V3h3V1H1zm13 0h-5v2h3v3h2V1zM1 10v5h5v-2H3v-3H1zm13 0h-2v3h-3v2h5v-5z"/>
+      </svg>
+      Exit Fullscreen
+    `;
+  }
+
+  const bloggerURL = "https://www.biobzarre.com/p/earth-sim.html?m=1"; // Replace with your real URL
 
   fullscreenBtn.addEventListener('click', () => {
-    const fromBlogger = getQueryParam('from') === 'blogger';
-
     if (isMobile()) {
       if (fromBlogger) {
-        window.open(bloggerURL, "_top"); // Return to Blogger
+        window.open(bloggerURL, "_top"); // Go back
       } else {
-        window.open("https://qjoshh.github.io/earthsin/?from=blogger", "_top"); // Go to full version
+        window.open("https://qjoshh.github.io/earthsin/?from=blogger", "_top"); // Go full
       }
       return;
     }
 
-    // Desktop fullscreen toggle
+    // ✅ Desktop fullscreen toggle
     const docEl = document.documentElement;
     const isFullscreen = document.fullscreenElement ||
                          document.webkitFullscreenElement ||
@@ -2776,6 +2784,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
+
 
 
   

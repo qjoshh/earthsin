@@ -368,35 +368,24 @@
         }
       }, { passive: false });
 
-      let lastTapTime = 0;
       let tapTimeout = null;
+      let lastTapTime = 0;
 
       renderer.domElement.addEventListener('touchend', (e) => {
         isDragging = false;
 
-        // Only respond to single-finger taps
+        // Only handle single-finger taps
         if (e.touches.length > 0 || e.changedTouches.length > 1) return;
 
         const currentTime = new Date().getTime();
         const tapGap = currentTime - lastTapTime;
 
-        if (tapGap < 300) {
-          // ✅ Double tap detected
+        if (tapGap < 300 && tapGap > 0) {
           autoRotate = !autoRotate;
+          console.log("Double-tap detected. Auto-rotate:", autoRotate);
           lastTapTime = 0;
-
-          // Optional: Feedback
-          console.log('Double-tap detected. Auto-rotate:', autoRotate);
         } else {
           lastTapTime = currentTime;
-
-          // Clear timeout just in case
-          if (tapTimeout) clearTimeout(tapTimeout);
-
-          // Optional: fallback single tap action here, if needed
-          tapTimeout = setTimeout(() => {
-            tapTimeout = null;
-          }, 300);
         }
       }, { passive: false });
 
@@ -2557,11 +2546,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
       // Animation loop
       function animate() {
         requestAnimationFrame(animate);
-
-        // 👉 Auto-rotation logic
-        if (autoRotate && !isDragging) {
-          earthRotation.y += 0.0015; // Adjust speed as needed
-        }
 
         // Apply rotation to Earth and atmosphere
         earthMesh.rotation.x = earthRotation.x;

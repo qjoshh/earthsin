@@ -2732,14 +2732,35 @@ renderer.domElement.addEventListener('touchend', (e) => {
     return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
+  function getQueryParam(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  const bloggerURL = "https://www.biobzarre.com/p/earth-sim.html"; // ✅ Replace this
+
   fullscreenBtn.addEventListener('click', () => {
-    // ✅ On mobile: simulate fullscreen by toggling a CSS class
+    const fromBlogger = getQueryParam('from') === 'blogger';
+
     if (isMobile()) {
-      document.body.classList.toggle('simulate-fullscreen');
+      if (fromBlogger) {
+        // ✅ Delay return slightly to ensure canvas closes cleanly
+        setTimeout(() => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = bloggerURL;
+          }
+        }, 150);
+      } else {
+        // ✅ Delay redirect so canvas doesn't break
+        setTimeout(() => {
+          window.location.href = "https://qjoshh.github.io/earthsin/?from=blogger";
+        }, 150);
+      }
       return;
     }
 
-    // ✅ On desktop: toggle native fullscreen
+    // ✅ Desktop only: native fullscreen toggle
     const docEl = document.documentElement;
     const isFullscreen = document.fullscreenElement ||
                          document.webkitFullscreenElement ||
@@ -2752,9 +2773,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
         docEl.webkitRequestFullscreen();
       } else if (docEl.msRequestFullscreen) {
         docEl.msRequestFullscreen();
-      } else {
-        // ❌ No need to alert anymore
-        console.log("Native fullscreen not supported.");
       }
     } else {
       if (document.exitFullscreen) {
@@ -2767,6 +2785,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
+
 
 
   

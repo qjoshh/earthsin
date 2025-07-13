@@ -216,8 +216,8 @@
       // Load Earth texture
       const textureLoader = new THREE.TextureLoader();
 
-      const highResTexture = textureLoader.load('/world.topo.200409.3x21600x10800.jpg'); // detailed
-      const bumpTexture = textureLoader.load('/topography.jpg');
+      const highResTexture = textureLoader.load('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEicUZ2GEPOKwEuUmtNxGXfLUZ8rIQRB5rtijXOO3q1T4VHAEHCDYHSy0WD4rcGCLffRsjP4ctHdN7HEOVf8R_YU8Vce9x7v_8Myb8xv9CKmrTrZISpL8P0sqPRQKD2_XI2U759cSZGTyQ07kBrkywfddKHB57u9s4eskpgRdLFncEVdZ7_1N7v8SN4AccdA/s16000/world.topo.200409.3x21600x10800.jpg'); // detailed
+      const bumpTexture = textureLoader.load('https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjgkrzVnGKkmmBlRKpMHM8igp8aRa8uuk7i4Tgr1btu5bVp4UANt079BOQ2nCbcPf6HFDpMOm23DPYXis2hXf8vTqH-d6buKzqNZhv1mpAdUnv6b7xD697qx4eFzSdqv4t0DNqAgCmuJ_wz04pdyZTZO6Gc0UX24J-9BWg74NytzvKdiUXSHGsNGZ4M4r37/s16000/topography.jpg');
       const specularMap = textureLoader.load('textures/earth_specular.png');
 
 
@@ -2013,8 +2013,8 @@
         const spriteMaterial = new THREE.SpriteMaterial({
           map: new THREE.TextureLoader().load(
             mode === 'normal'
-              ? '/vecteezy_button-pin-clipart-design-illustration_9394203.png'
-              : '/vecteezy_circle-that-has-orange-color_44313728.png'
+              ? 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhIRZi0j4f3Z7mk_KnrEpHlioqncYKSj96R7yae_0lmhuMWkKYz02-vrajgLrtD4g79ESQn7XHkf44_BNS0eYfb7gV5xDhHhGyyObFQuxH75xuvU2XAYT50pNgRttva-A5DQrQSMI59uwi1lBTLeeTM9NnuibEZkkTYQ4DNDTDfrAnKcNn_nrAMjZCCyuuO/s16000/vecteezy_button-pin-clipart-design-illustration_9394203.png'
+              : 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiA4dgmde2cdITnaAiCKUkSHXmf8L02sGZHvVuNVZ9WwoDUxKIikE132nfdsA56tGXkR8M9zWq0cd5hidBviFen7SJQl-jD4KjpMGnANheS6Hyy8yHbnagwiZbIZENgsbadixFNafpBtA03ErSBoayKK1uh7KYxgiApujKYZAZZIOWt3T6IClbL0evB5lGA/s16000/vecteezy_circle-that-has-orange-color_44313728.png'
           ),
           transparent: true,
           opacity: 1

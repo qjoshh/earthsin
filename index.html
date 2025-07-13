@@ -368,8 +368,20 @@
         }
       }, { passive: false });
 
+      let lastTapTime = 0;
+
       renderer.domElement.addEventListener('touchend', () => {
         isDragging = false;
+
+        // 👇 Add double-tap detection here
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+
+        if (tapLength < 300 && tapLength > 0 && e.touches.length === 0) {
+          autoRotate = !autoRotate;
+        }
+
+        lastTapTime = currentTime;
       });
 
 

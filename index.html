@@ -2732,14 +2732,34 @@ renderer.domElement.addEventListener('touchend', (e) => {
     return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
+  function getQueryParam(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  // ✅ Your Blogger return URL
+  const bloggerURL = "https://www.biobzarre.com/p/earth-sim.html";
+
   fullscreenBtn.addEventListener('click', () => {
-    if (isMobile()) {
-      // ✅ On mobile: open full simulation in the current tab
-      window.location.href = "https://qjoshh.github.io/earthsin/";
+    const fromBlogger = getQueryParam('from') === 'blogger';
+
+    // ✅ If user is on mobile and viewing full version after clicking from Blogger
+    if (isMobile() && fromBlogger) {
+      if (window.history.length > 1) {
+        window.history.back(); // go back to Blogger
+      } else {
+        window.location.href = bloggerURL; // fallback if opened in new tab
+      }
       return;
     }
 
-    // ✅ On desktop: toggle native fullscreen
+    // ✅ If user is on mobile in the iframe (no ?from=blogger)
+    if (isMobile() && !fromBlogger) {
+      // Redirect to full simulation page with return flag
+      window.location.href = "https://qjoshh.github.io/earthsin/?from=blogger";
+      return;
+    }
+
+    // ✅ Desktop: toggle native fullscreen
     const docEl = document.documentElement;
     const isFullscreen = document.fullscreenElement ||
                          document.webkitFullscreenElement ||
@@ -2747,7 +2767,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
     if (!isFullscreen) {
       if (docEl.requestFullscreen) {
-        docEl.requestFullscreen();
+        docEl.requestFullscreen().catch(() => {});
       } else if (docEl.webkitRequestFullscreen) {
         docEl.webkitRequestFullscreen();
       } else if (docEl.msRequestFullscreen) {
@@ -2764,6 +2784,8 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
+
+
 
 
   

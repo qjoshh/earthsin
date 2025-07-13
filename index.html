@@ -78,10 +78,14 @@
     #searchContainer {
       position: relative;
       width: 250px;
+      overflow: hidden; /* ✅ prevents bleeding */
+      z-index: 1000; /* bring to front safely */
     }
 
     #searchRegion {
       width: 100%;
+      max-width: 250px; /* ✅ keep consistent on all screen sizes */
+      box-sizing: border-box;
       padding: 12px 16px;
       font-size: 14px;
       border-radius: 8px;

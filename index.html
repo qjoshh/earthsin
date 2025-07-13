@@ -32,7 +32,7 @@
       padding: 20px;
       border-radius: 15px;
       max-width: 350px;
-      z-index: 10;
+      z-index: 9999; /* ✅ Ensure it's above canvas, arrows, UI, etc. */
       display: none;
       transition: all 0.4s ease;
       box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);

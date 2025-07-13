@@ -220,9 +220,11 @@
   height: 100vh;
   overflow: hidden;
 }
-.simulate-fullscreen #globe {
-  height: 100vh;
+.simulate-fullscreen #globe,
+.simulate-fullscreen canvas {
   width: 100vw;
+  height: 100vh;
+  display: block;
 }
   </style>
 </head>
@@ -2724,41 +2726,48 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
 
 <script>
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+
   function isMobile() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-fullscreenBtn.addEventListener('click', () => {
-  if (isMobile()) {
-    document.body.classList.toggle('simulate-fullscreen');
-    return; // skip native fullscreen on mobile
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
-  const docEl = document.documentElement;
-  const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+  fullscreenBtn.addEventListener('click', () => {
+    // ✅ On mobile: simulate fullscreen by toggling a CSS class
+    if (isMobile()) {
+      document.body.classList.toggle('simulate-fullscreen');
+      return;
+    }
 
-  if (!isFullscreen) {
-    if (docEl.requestFullscreen) {
-      docEl.requestFullscreen();
-    } else if (docEl.webkitRequestFullscreen) {
-      docEl.webkitRequestFullscreen();
-    } else if (docEl.msRequestFullscreen) {
-      docEl.msRequestFullscreen();
+    // ✅ On desktop: toggle native fullscreen
+    const docEl = document.documentElement;
+    const isFullscreen = document.fullscreenElement ||
+                         document.webkitFullscreenElement ||
+                         document.msFullscreenElement;
+
+    if (!isFullscreen) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      } else {
+        // ❌ No need to alert anymore
+        console.log("Native fullscreen not supported.");
+      }
     } else {
-      alert("Fullscreen is not supported on this browser.");
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
     }
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    } else if (document.msExitFullscreen) {
-      document.msExitFullscreen();
-    }
-  }
-});
-
+  });
 </script>
+
 
 
 

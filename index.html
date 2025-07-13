@@ -277,6 +277,42 @@
   height: 100vh;
   display: block;
 }
+    /* 🔻 Hide these by default and prepare for fade animation */
+    #streakCounter,
+    #instructions {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    /* 🔻 Shown with this class */
+    .visible {
+      display: block !important;
+      opacity: 1 !important;
+    }
+
+    /* 🔘 Style for the "More Info" button */
+    #toggleMore {
+      position: absolute;
+      bottom: 80px;
+      right: 10px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(0, 255, 204, 0.15);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 10000;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    #toggleMore:hover {
+      background: rgba(0, 255, 204, 0.3);
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 
@@ -296,9 +332,10 @@
   <div id="instructions">
     🖱️ Drag: Rotate Earth (any direction)<br />
     🔄 Wheel: Zoom In/Out<br />
-    👆 Click Arrow: Get Facts<br />
+    👆 Click Circle: Get Facts<br />
     ⚡ Double-click: Toggle Auto-rotation
   </div>
+  <button id="toggleMore">More Info</button>
   <canvas id="globe"></canvas>
 
    <!-- ✅ Fullscreen Button -->
@@ -2826,6 +2863,34 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
+
+
+    <script>
+    const moreBtn = document.getElementById('toggleMore');
+    const streakCounter = document.getElementById('streakCounter');
+    const instructions = document.getElementById('instructions');
+
+    let isVisible = false;
+
+    function toggleVisibility(el, show) {
+      if (show) {
+        el.style.display = 'block';
+        requestAnimationFrame(() => el.classList.add('visible'));
+      } else {
+        el.classList.remove('visible');
+        setTimeout(() => {
+          el.style.display = 'none';
+        }, 400); // Match transition duration
+      }
+    }
+
+    moreBtn.addEventListener('click', () => {
+      isVisible = !isVisible;
+      toggleVisibility(streakCounter, isVisible);
+      toggleVisibility(instructions, isVisible);
+      moreBtn.textContent = isVisible ? 'Hide Info' : 'More Info';
+    });
+  </script>
   
 </body>
 

@@ -2558,6 +2558,11 @@ renderer.domElement.addEventListener('touchend', (e) => {
       function animate() {
         requestAnimationFrame(animate);
 
+        // 👉 Auto-rotation logic
+        if (autoRotate && !isDragging) {
+          earthRotation.y += 0.0015; // Adjust speed as needed
+        }
+
         // Apply rotation to Earth and atmosphere
         earthMesh.rotation.x = earthRotation.x;
         earthMesh.rotation.y = earthRotation.y;

@@ -277,6 +277,35 @@
   height: 100vh;
   display: block;
 }
+
+    @media (max-width: 600px) {
+      #controls {
+        position: absolute;
+        top: 20px;
+        right: 10px;
+        align-items: flex-end;
+      }
+
+      #controls>button,
+      #searchRegion {
+        width: 75%;
+        min-width: unset;
+        padding: 10px 8px;
+        font-size: 13px;
+      }
+
+      #searchContainer {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      #searchResults {
+        max-width: 90%;
+        left: auto;
+        right: 0;
+      }
+    }
     /* 🔻 Hide these by default and prepare for fade animation */
     #streakCounter,
     #instructions {
@@ -330,7 +359,7 @@
   <div class="loading">Loading Earth Simulator...</div>
   <div id="infoBox"></div>
   <div id="controls">
-    <button id="toggleMode">Switch to Bizarre Mode</button>
+    <button id="toggleMode">Bizarre Mode</button>
     <button id="randomSpin">🎲 Random Spin</button>
     <button id="focusRegion">🎯 Focus Region</button>
     <div id="searchContainer">
@@ -2629,7 +2658,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
       // Controls
       toggleBtn.onclick = () => {
         mode = mode === 'normal' ? 'bizarre' : 'normal';
-        toggleBtn.textContent = `Switch to ${mode === 'normal' ? 'Bizarre' : 'Normal'} Mode`;
+        toggleBtn.textContent = `${mode === 'normal' ? 'Bizarre' : 'Normal'} Mode`;
         toggleBtn.style.background = mode === 'normal' ? 'rgba(17, 17, 17, 0.9)' : 'rgba(255, 0, 0, 0.2)';
         createArrowMarkers();
         infoBox.style.display = 'none';

@@ -216,9 +216,8 @@
       // Load Earth texture
       const textureLoader = new THREE.TextureLoader();
 
-      const highResTexture = textureLoader.load('world.topo.200409.3x21600x10800.jpg'); // detailed
-      const bumpTexture = textureLoader.load('topography.jpg');
-      const specularMap = textureLoader.load('textures/earth_specular.png');
+      const highResTexture = textureLoader.load('https://github.com/qjoshh/earthsin/blob/main/world.topo.200409.3x21600x10800.jpg'); // detailed
+      const bumpTexture = textureLoader.load('https://github.com/qjoshh/earthsin/blob/main/topography.jpg');
 
 
 
@@ -226,7 +225,6 @@
         map: highResTexture, // default to low-res
         bumpMap: bumpTexture,
         bumpScale: 0.2,
-        specularMap: specularMap,
         specular: new THREE.Color('grey'),
         shininess: 10
       });
@@ -2013,8 +2011,8 @@
         const spriteMaterial = new THREE.SpriteMaterial({
           map: new THREE.TextureLoader().load(
             mode === 'normal'
-              ? 'vecteezy_button-pin-clipart-design-illustration_9394203.png'
-              : 'vecteezy_circle-that-has-orange-color_44313728.png'
+              ? 'https://github.com/qjoshh/earthsin/blob/main/vecteezy_button-pin-clipart-design-illustration_9394203.png'
+              : 'https://github.com/qjoshh/earthsin/blob/main/vecteezy_circle-that-has-orange-color_44313728.png'
           ),
           transparent: true,
           opacity: 1

@@ -2733,9 +2733,9 @@ renderer.domElement.addEventListener('touchend', (e) => {
   }
 
   fullscreenBtn.addEventListener('click', () => {
-    // ✅ On mobile: simulate fullscreen by toggling a CSS class
     if (isMobile()) {
-      document.body.classList.toggle('simulate-fullscreen');
+      // ✅ On mobile: open full simulation in the current tab
+      window.location.href = "https://qjoshh.github.io/earthsin/";
       return;
     }
 
@@ -2747,14 +2747,11 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
     if (!isFullscreen) {
       if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
+        docEl.requestFullscreen();
       } else if (docEl.webkitRequestFullscreen) {
         docEl.webkitRequestFullscreen();
       } else if (docEl.msRequestFullscreen) {
         docEl.msRequestFullscreen();
-      } else {
-        // ❌ No need to alert anymore
-        console.log("Native fullscreen not supported.");
       }
     } else {
       if (document.exitFullscreen) {
@@ -2767,8 +2764,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
-
-
 
 
   

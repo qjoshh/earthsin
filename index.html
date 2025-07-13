@@ -96,6 +96,13 @@
       backdrop-filter: blur(5px);
       transition: all 0.3s ease;
     }
+    @media (max-width: 600px) {
+      #searchRegion {
+        font-size: 16px;
+        /* 👈 Must be at least this size to prevent zoom */
+
+      }
+    }
 
     #searchRegion:focus {
       border: 2px solid #00ffcc;

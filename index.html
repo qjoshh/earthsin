@@ -2726,48 +2726,56 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
 
 <script>
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+  function isMobile() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
+  // ✅ This was missing!
+  function getQueryParam(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  const bloggerURL = "https://www.biobzarre.com/p/earth-sim.html?m=1"; // Replace this!
+
   fullscreenBtn.addEventListener('click', () => {
-  const fromBlogger = getQueryParam('from') === 'blogger';
+    const fromBlogger = getQueryParam('from') === 'blogger';
 
-  if (isMobile()) {
-    if (fromBlogger) {
-      // ✅ Return to Blogger, safely break out of iframe context
-      window.open("https://www.biobzarre.com/p/earth-sim.html?m=1", "_top");
+    if (isMobile()) {
+      if (fromBlogger) {
+        window.open(bloggerURL, "_top"); // Return to Blogger
+      } else {
+        window.open("https://qjoshh.github.io/earthsin/?from=blogger", "_top"); // Go to full version
+      }
       return;
+    }
+
+    // Desktop fullscreen toggle
+    const docEl = document.documentElement;
+    const isFullscreen = document.fullscreenElement ||
+                         document.webkitFullscreenElement ||
+                         document.msFullscreenElement;
+
+    if (!isFullscreen) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
     } else {
-      // ✅ Open full simulation in top window
-      window.open("https://qjoshh.github.io/earthsin/?from=blogger", "_top");
-      return;
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
     }
-  }
-
-  // ✅ Desktop: toggle native fullscreen
-  const docEl = document.documentElement;
-  const isFullscreen = document.fullscreenElement ||
-                       document.webkitFullscreenElement ||
-                       document.msFullscreenElement;
-
-  if (!isFullscreen) {
-    if (docEl.requestFullscreen) {
-      docEl.requestFullscreen().catch(() => {});
-    } else if (docEl.webkitRequestFullscreen) {
-      docEl.webkitRequestFullscreen();
-    } else if (docEl.msRequestFullscreen) {
-      docEl.msRequestFullscreen();
-    }
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    } else if (document.msExitFullscreen) {
-      document.msExitFullscreen();
-    }
-  }
-});
-
+  });
 </script>
-
 
 
   

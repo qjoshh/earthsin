@@ -193,6 +193,28 @@
     cursor: pointer;
     z-index: 9999;
   }
+
+    @media (max-width: 768px) {
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #globe, canvas {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+  }
+
+  #fullscreenBtn {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    z-index: 9999;
+  }
+}
   </style>
 </head>
 
@@ -2693,35 +2715,40 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
 
 <script>
-  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  function isMobile() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
 
-  fullscreenBtn.addEventListener('click', () => {
-    const docEl = document.documentElement;
-    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+fullscreenBtn.addEventListener('click', () => {
+  if (isMobile()) {
+    document.body.classList.toggle('simulate-fullscreen');
+    return; // skip native fullscreen on mobile
+  }
 
-    // Enter Fullscreen
-    if (!isFullscreen) {
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(err => alert("Fullscreen is not supported on this device."));
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
-      } else if (docEl.msRequestFullscreen) {
-        docEl.msRequestFullscreen();
-      } else {
-        alert("Fullscreen is not supported on this browser.");
-      }
-    } 
-    // Exit Fullscreen
-    else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
+  const docEl = document.documentElement;
+  const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+  if (!isFullscreen) {
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen();
+    } else if (docEl.webkitRequestFullscreen) {
+      docEl.webkitRequestFullscreen();
+    } else if (docEl.msRequestFullscreen) {
+      docEl.msRequestFullscreen();
+    } else {
+      alert("Fullscreen is not supported on this browser.");
     }
-  });
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  }
+});
+
 </script>
 
 

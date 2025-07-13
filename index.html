@@ -2728,42 +2728,22 @@ renderer.domElement.addEventListener('touchend', (e) => {
 <script>
   const fullscreenBtn = document.getElementById('fullscreenBtn');
 
-  // ✅ Detect if user is on a mobile device
   function isMobile() {
     return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
-  // ✅ Utility to read ?from=blogger query
-  function getQueryParam(name) {
-    return new URLSearchParams(window.location.search).get(name);
-  }
-
   fullscreenBtn.addEventListener('click', () => {
-    const fromBlogger = getQueryParam('from') === 'blogger';
-
-    // ✅ If user is on mobile and came from Blogger
-    if (isMobile() && fromBlogger) {
-      // Option 1: Go back to previous page (usually Blogger)
-      window.history.back();
-
-      // Option 2: Redirect explicitly (uncomment if preferred)
-      // window.location.href = "https://your-blog-url.com";
+    // ✅ On mobile: simulate fullscreen by toggling a CSS class
+    if (isMobile()) {
+      document.body.classList.toggle('simulate-fullscreen');
       return;
     }
 
-    // ✅ If user is on mobile in embedded mode (Blogger iframe)
-    if (isMobile() && !fromBlogger) {
-      // Go to full simulation page with return signal
-      window.location.href = "https://qjoshh.github.io/earthsin/?from=blogger";
-      return;
-    }
-
-    // ✅ Desktop behavior: native fullscreen toggle
+    // ✅ On desktop: toggle native fullscreen
     const docEl = document.documentElement;
-    const isFullscreen =
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.msFullscreenElement;
+    const isFullscreen = document.fullscreenElement ||
+                         document.webkitFullscreenElement ||
+                         document.msFullscreenElement;
 
     if (!isFullscreen) {
       if (docEl.requestFullscreen) {
@@ -2772,6 +2752,9 @@ renderer.domElement.addEventListener('touchend', (e) => {
         docEl.webkitRequestFullscreen();
       } else if (docEl.msRequestFullscreen) {
         docEl.msRequestFullscreen();
+      } else {
+        // ❌ No need to alert anymore
+        console.log("Native fullscreen not supported.");
       }
     } else {
       if (document.exitFullscreen) {
@@ -2784,7 +2767,6 @@ renderer.domElement.addEventListener('touchend', (e) => {
     }
   });
 </script>
-
 
 
   

@@ -313,6 +313,16 @@
       background: rgba(0, 255, 204, 0.3);
       transform: translateY(-2px);
     }
+    /* 🌌 Smooth fade transition for the controls UI */
+    #controls {
+      transition: opacity 0.4s ease;
+    }
+
+    /* 🚫 Dimmed when zoomed in */
+    .ui-dimmed {
+      opacity: 0.1;
+      pointer-events: none;
+    }
   </style>
 </head>
 
@@ -453,6 +463,17 @@
       let autoRotate = true;
       let cameraDistance = 250;
 
+      const controlsUI = document.getElementById('controls');
+      const dimThreshold = isMobile ? 150 : 80; // Adjust threshold for mobile/desktop
+
+      function updateUIFade() {
+        if (cameraDistance < dimThreshold) {
+          controlsUI.classList.add('ui-dimmed');
+        } else {
+          controlsUI.classList.remove('ui-dimmed');
+        }
+      }
+
       // Improved mouse controls for free rotation
       renderer.domElement.addEventListener('mousedown', (e) => {
         isDragging = true;
@@ -494,6 +515,7 @@
         const maxZoom = isMobile ? 180 : 150;
         cameraDistance = Math.max(minZoom, Math.min(maxZoom, cameraDistance));
         camera.position.z = cameraDistance;
+        updateUIFade();
       });
 
       
@@ -568,6 +590,8 @@ renderer.domElement.addEventListener('touchmove', (e) => {
   cameraDistance = Math.max(minZoom, Math.min(maxZoom, cameraDistance));
 
   camera.position.z = cameraDistance;
+  // 👇 Add this right after
+  updateUIFade();
 }
 
 

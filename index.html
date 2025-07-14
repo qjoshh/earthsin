@@ -438,15 +438,67 @@
       scene.add(earthMesh);
 
       // Country Borders from GeoJSON
-      fetch('/ne_110m_admin_0_countries.json')
+      const bordersGroup = new THREE.Group();
+      scene.add(bordersGroup);
+
+      fetch('./ne_10m_admin_0_countries.json')
         .then(res => res.json())
         .then(data => {
-          data.features.forEach(feature => {
-            const geometry = new THREE.GeoJsonGeometry(feature.geometry, 50);
-            const material = new THREE.LineBasicMaterial({ color: 0x00ffcc });
-            const line = new THREE.LineSegments(geometry, material);
-            scene.add(line);
+          if (!data.features) return;
+
+          data.features.forEach((feature) => {
+            try {
+              const geometry = new GeoJsonGeometry(feature.geometry);
+              const line = new THREE.Line(
+                geometry,
+                new THREE.LineBasicMaterial({ color: 0x00ffcc })
+              );
+              line.scale.set(50, 50, 50);
+              line.position.set(0, 0, 0);
+              line.userData.isBorder = true;
+              bordersGroup.add(line);
+            } catch (error) {
+              // Skip invalid geometries
+            }
           });
+
+          // Rotate the entire border net around the globe to align
+          bordersGroup.rotation.y = Math.PI / 2;
+        });
+
+
+        
+      // States Borders from GeoJSON
+      const statesGroup = new THREE.Group();
+      scene.add(statesGroup);
+
+      fetch('./ne_10m_admin_1_states_provinces.json')
+        .then(res => res.json())
+        .then(data => {
+          if (!data.features) return;
+
+          data.features.forEach((feature) => {
+            try {
+              const geometry = new GeoJsonGeometry(feature.geometry);
+              const line = new THREE.Line(
+                geometry,
+                new THREE.LineBasicMaterial({
+                  color: 0xff6600,
+                  opacity: 0.8,
+                  transparent: true
+                })
+              );
+              line.scale.set(50, 50, 50);
+              line.position.set(0, 0, 0);
+              line.userData.isState = true;
+              statesGroup.add(line);
+            } catch (error) {
+              // Skip invalid geometries
+            }
+          });
+
+          // Apply same alignment rotation as borders
+          statesGroup.rotation.y = 0;
         });
 
 
@@ -2785,6 +2837,16 @@ renderer.domElement.addEventListener('touchend', (e) => {
         atmosphere.rotation.y = earthRotation.y;
 
 
+        // Apply the same rotation to borders group BUT with 90 degree offset
+        bordersGroup.rotation.x = earthRotation.x;
+        bordersGroup.rotation.y = earthRotation.y + Math.PI / 2; // Add 90 degrees offset
+
+
+        // In your animate function, add after bordersGroup rotation for Statesgroup:
+        statesGroup.rotation.x = earthRotation.x;
+        statesGroup.rotation.y = earthRotation.y + Math.PI / 2;
+
+
 
         arrowMarkers.forEach((sprite) => {
           const camDir = camera.position.clone().sub(sprite.position).normalize(); // vector from sprite to camera
@@ -2850,6 +2912,14 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
         // Rotate stars slowly
         stars.rotation.y += 0.0002;
+
+        // This is the zoom control for country borders
+        const cameraDistance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
+        bordersGroup.visible = cameraDistance < 100; // Borders appear when zooming IN (closer)
+
+        statesGroup.visible = cameraDistance < 80; // States appear when even closer
+
+        
 
         renderer.render(scene, camera);
       }

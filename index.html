@@ -600,8 +600,8 @@
         e.preventDefault();
         const zoomSpeed = isMobile ? (cameraDistance / 300) : 0.2; // slower on mobile
         cameraDistance += e.deltaY * zoomSpeed;
-        const minZoom = isMobile ? 80 : 70;
-        const maxZoom = isMobile ? 180 : 150;
+        const minZoom = isMobile ? 70 : 70;
+        const maxZoom = isMobile ? 180 : 1000;
         cameraDistance = Math.max(minZoom, Math.min(maxZoom, cameraDistance));
         camera.position.z = cameraDistance;
         updateUIFade();

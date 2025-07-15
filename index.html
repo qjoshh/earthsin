@@ -598,6 +598,8 @@
           rotationVelocity.x = deltaMove.y * 0.01;
           rotationVelocity.y = deltaMove.x * 0.01;
 
+          console.log(`Rotation speed adjusted to: ${adjustedSpeed.toFixed(4)} at zoom level ${cameraDistance.toFixed(2)}`);
+
           earthRotation.x += rotationVelocity.x;
           earthRotation.y += rotationVelocity.y;
 
@@ -650,6 +652,8 @@
 
           rotationVelocity.x = deltaMove.y * 0.01;
           rotationVelocity.y = deltaMove.x * 0.01;
+
+          console.log(`Rotation speed adjusted to: ${adjustedSpeed.toFixed(4)} at zoom level ${cameraDistance.toFixed(2)}`);
 
           earthRotation.x += rotationVelocity.x;
           earthRotation.y += rotationVelocity.y;

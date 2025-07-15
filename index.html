@@ -454,6 +454,7 @@
           data.features.forEach((feature) => {
             try {
               const geometry = new GeoJsonGeometry(feature.geometry);
+              console.log(`Feature ${index} geometry created:`, geometry); // ADD THIS
               const line = new THREE.Line(
                 geometry,
                 new THREE.LineBasicMaterial({ color: 0x00ffcc })

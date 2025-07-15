@@ -583,6 +583,18 @@
             y: e.clientY - previousMousePosition.y
           };
 
+          // Adjust spin speed based on zoom (closer = slower)
+          let adjustedSpeed;
+
+          if (cameraDistance <= 100) {
+            // If zoomed in close, apply reduced sensitivity
+            const zoomFactor = cameraDistance / 100; // normalize around zoom threshold
+            adjustedSpeed = 0.001 * zoomFactor; // slow spin
+          } else {
+            // If zoomed out, use normal full speed
+            adjustedSpeed = 0.01; // default spin
+          }
+
           rotationVelocity.x = deltaMove.y * 0.01;
           rotationVelocity.y = deltaMove.x * 0.01;
 
@@ -623,6 +635,18 @@
             x: e.touches[0].clientX - previousMousePosition.x,
             y: e.touches[0].clientY - previousMousePosition.y
           };
+
+          // Adjust spin speed based on zoom (closer = slower)
+          let adjustedSpeed;
+
+          if (cameraDistance <= 100) {
+            // If zoomed in close, apply reduced sensitivity
+            const zoomFactor = cameraDistance / 100; // normalize around zoom threshold
+            adjustedSpeed = 0.001 * zoomFactor; // slow spin
+          } else {
+            // If zoomed out, use normal full speed
+            adjustedSpeed = 0.01; // default spin
+          }
 
           rotationVelocity.x = deltaMove.y * 0.01;
           rotationVelocity.y = deltaMove.x * 0.01;

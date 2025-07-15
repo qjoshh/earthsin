@@ -438,6 +438,24 @@
       scene.add(earthMesh);
 
       // Country Borders from GeoJSON
+
+      const url = './ne_10m_admin_0_countries.json';
+console.log('Fetching from:', new URL(url, window.location.href).href);
+
+fetch(url)
+  .then(response => {
+    console.log('Actual URL requested:', response.url);
+    console.log('Response status:', response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('Success!', data);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+
+      
       const bordersGroup = new THREE.Group();
       scene.add(bordersGroup);
 

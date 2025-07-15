@@ -437,6 +437,8 @@
       earthMesh.receiveShadow = true;
       scene.add(earthMesh);
 
+
+      
       // Country Borders from GeoJSON
       const bordersGroup = new THREE.Group();
       scene.add(bordersGroup);
@@ -478,6 +480,8 @@
       fetch('ne_10m_admin_1_states_provinces.json')
         .then(res => res.json())
         .then(data => {
+          
+          console.log('JSON loaded successfully, features:', data.features.length);
           if (!data.features) return;
 
           data.features.forEach((feature) => {

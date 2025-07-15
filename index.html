@@ -441,7 +441,7 @@
       const bordersGroup = new THREE.Group();
       scene.add(bordersGroup);
 
-      fetch('/ne_10m_admin_0_countries.json')
+      fetch('./ne_10m_admin_0_countries.json')
         .then(res => res.json())
         .then(data => {
           if (!data.features) return;
@@ -472,7 +472,7 @@
       const statesGroup = new THREE.Group();
       scene.add(statesGroup);
 
-      fetch('/ne_10m_admin_1_states_provinces.json')
+      fetch('./ne_10m_admin_1_states_provinces.json')
         .then(res => res.json())
         .then(data => {
           if (!data.features) return;
